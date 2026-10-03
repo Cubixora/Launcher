@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.42
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:cinzel.ttf",
+      "size": 7.43,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.37
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

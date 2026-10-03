@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.61
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:grotesk.ttf",
+      "size": 8.03,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.4
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

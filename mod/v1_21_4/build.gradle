@@ -1,0 +1,42 @@
+plugins {
+    id 'net.fabricmc.fabric-loom-remap'
+}
+
+def deps = rootProject.fabricDeps(project.minecraft_version)
+version = "${rootProject.mod_version}+${project.minecraft_version}"
+group = 'com.cubixora'
+base { archivesName = 'cubixora-cosmetics' }
+
+sourceSets {
+    main {
+        java.srcDir '../shared/java'
+        resources.srcDir '../shared/resources'
+        resources.srcDir '../shared/client-resources'
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    mappings "net.fabricmc:yarn:${deps.yarn}:v2"
+    modImplementation "net.fabricmc:fabric-loader:${deps.loader}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${deps.api}"
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand version: project.version }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = project.java_version as Integer
+    it.options.encoding = 'UTF-8'
+}
+
+// derlenen modu launcher'a koy: src/mod-jars/<klasör>/cubixora-cosmetics.jar
+tasks.register('deployJar', Copy) {
+    dependsOn remapJar
+    from remapJar.archiveFile
+    into rootProject.file("../src/mod-jars/${project.name}")
+    rename { 'cubixora-cosmetics.jar' }
+}
+build.finalizedBy deployJar

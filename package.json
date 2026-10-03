@@ -1,0 +1,43 @@
+{
+  "name": "cubixora-launcher",
+  "productName": "Cubixora Launcher",
+  "version": "1.0.0",
+  "description": "Cubixora - Offline ve Microsoft girişli Minecraft launcher",
+  "main": "src/boot.js",
+  "author": "Cubixora",
+  "license": "SEE LICENSE IN LICENSE",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis"
+  },
+  "dependencies": {
+    "minecraft-launcher-core": "^3.18.2",
+    "msmc": "^5.0.5"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.cubixora.launcher",
+    "productName": "Cubixora Launcher",
+    "directories": {
+      "output": "kurulum"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "Cubixora Launcher",
+      "artifactName": "Cubixora-Launcher.${ext}"
+    }
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.25
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:rubik.ttf",
+      "size": 6.57,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.19
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

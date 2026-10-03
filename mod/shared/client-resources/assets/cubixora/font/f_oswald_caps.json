@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.03
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:oswald.ttf",
+      "size": 5.91,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.17
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

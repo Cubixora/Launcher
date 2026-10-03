@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.49
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:rajdhani.ttf",
+      "size": 7.66,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.38
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

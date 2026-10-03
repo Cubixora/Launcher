@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.41
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:righteous.ttf",
+      "size": 7.42,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.37
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

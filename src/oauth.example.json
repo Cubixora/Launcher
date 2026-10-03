@@ -1,0 +1,6 @@
+{
+  "google": {
+    "clientId": "GOOGLE_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+    "clientSecret": "GOOGLE_OAUTH_CLIENT_SECRET"
+  }
+}

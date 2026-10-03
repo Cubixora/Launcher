@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 3.9
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:vt323.ttf",
+      "size": 10.98,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.61
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

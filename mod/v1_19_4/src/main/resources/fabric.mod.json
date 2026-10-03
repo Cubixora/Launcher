@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "cubixora",
+  "version": "${version}",
+  "name": "Cubixora Cosmetics",
+  "description": "Cubixora Launcher kullanıcılarının skin, pelerin, kanat ve omuz arkadaşlarını oyunda gösterir.",
+  "authors": [
+    "Cubixora"
+  ],
+  "license": "MIT",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "com.cubixora.cosmetics.CubixoraClient"
+    ]
+  },
+  "mixins": [
+    "cubixora.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "minecraft": ">=1.19.3 <=1.19.4",
+    "fabric-api": "*",
+    "java": ">=17"
+  }
+}

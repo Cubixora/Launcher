@@ -1,0 +1,24 @@
+import groovy.json.JsonSlurper
+
+plugins {
+    id 'net.fabricmc.fabric-loom-remap' version '1.18.2' apply false
+    id 'net.fabricmc.fabric-loom' version '1.18.2' apply false
+}
+
+// Her Minecraft sürümü için doğru yarn / loader / Fabric API sürümünü Fabric'in sunucusundan bulur.
+def depCache = [:]
+ext.fabricDeps = { String mc ->
+    if (depCache[mc]) return depCache[mc]
+    def json = new JsonSlurper()
+    def yarnList = json.parse(new URL("https://meta.fabricmc.net/v2/versions/yarn/${mc}"))
+    def loader = json.parse(new URL('https://meta.fabricmc.net/v2/versions/loader')).find { it.stable }.version
+    def meta = new groovy.xml.XmlSlurper().parse('https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/maven-metadata.xml')
+    def all = meta.versioning.versions.version*.text()
+    def mm = mc.tokenize('.').take(2).join('.')
+    def api = all.findAll { it.endsWith("+${mc}") }
+    if (!api) api = all.findAll { it.endsWith("+${mm}") }
+    def r = [yarn: yarnList ? yarnList[0].version : null, loader: loader, api: api ? api.last() : null]
+    logger.lifecycle("Cubixora: Minecraft ${mc} -> yarn ${r.yarn}, loader ${r.loader}, fabric-api ${r.api}")
+    depCache[mc] = r
+    return r
+}

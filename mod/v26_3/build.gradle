@@ -1,0 +1,38 @@
+plugins {
+    id 'net.fabricmc.fabric-loom'
+}
+
+def deps = rootProject.fabricDeps(project.minecraft_version)
+version = "${rootProject.mod_version}+${project.minecraft_version}"
+group = 'com.cubixora'
+base { archivesName = 'cubixora-cosmetics' }
+
+sourceSets {
+    main {
+        resources.srcDir '../shared/resources'
+    }
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${project.minecraft_version}"
+    implementation "net.fabricmc:fabric-loader:${deps.loader}"
+    implementation "net.fabricmc.fabric-api:fabric-api:${deps.api}"
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') { expand version: project.version }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = project.java_version as Integer
+    it.options.encoding = 'UTF-8'
+}
+
+tasks.register('deployJar', Copy) {
+    dependsOn jar
+    from jar.archiveFile
+    into rootProject.file("../src/mod-jars/${project.name}")
+    rename { 'cubixora-cosmetics.jar' }
+}
+build.finalizedBy deployJar

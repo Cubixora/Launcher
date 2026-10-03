@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.31
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:jetbrains.ttf",
+      "size": 7.1,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.35
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

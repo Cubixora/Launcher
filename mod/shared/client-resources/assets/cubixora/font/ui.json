@@ -1,0 +1,7 @@
+{
+  "providers": [
+    { "type": "space", "advances": { " ": 2.6 } },
+    { "type": "ttf", "file": "cubixora:exo2b.ttf", "size": 8.0, "oversample": 3.0, "shift": [0.0, -0.4], "skip": " " },
+    { "type": "reference", "id": "minecraft:default" }
+  ]
+}

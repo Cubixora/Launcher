@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 1.81
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:bebas.ttf",
+      "size": 5.58,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.28
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 3.23
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:nunito.ttf",
+      "size": 9.07,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.5
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+package com.cubixora.cosmetics;
+
+import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.rendering.v1.LivingEntityFeatureRendererRegistrationCallback;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.render.entity.PlayerEntityRenderer;
+import net.minecraft.client.util.InputUtil;
+import net.minecraft.text.LiteralText;
+import org.lwjgl.glfw.GLFW;
+
+public final class CubixoraClient implements ClientModInitializer {
+    @Override
+    public void onInitializeClient() {
+        CosmeticsManager.init();
+        AutoLogin.init();
+        AutoLogin.sender = Compat::sendCommand;
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> AutoLogin.onJoin(Compat.serverAddress(client)));
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> AutoLogin.onDisconnect());
+        AutoLogin.messagesSupported = false; // bu sürümde mesaj olayı yok: kısa süre sonra /login denenir
+        KeyBinding wingsKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.cubixora.wings", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_K, "category.cubixora"));
+        KeyBinding reloadKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                "key.cubixora.reload", InputUtil.Type.KEYSYM, GLFW.GLFW_KEY_UNKNOWN, "category.cubixora"));
+
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            AutoLogin.tick();
+            while (wingsKey.wasPressed()) {
+                if (client.player == null) continue;
+                Boolean open = Cubixora.toggleSelfWings(client.player.getGameProfile().getName());
+                client.player.sendMessage(new LiteralText(open == null
+                        ? "\u00a77Kanat se\u00e7ili de\u011fil. Cubixora Launcher > Kozmetik'ten se\u00e7ebilirsin."
+                        : open ? "\u00a7fKanatlar \u00a7aa\u00e7\u0131ld\u0131" : "\u00a7fKanatlar \u00a7ckapand\u0131"), true);
+            }
+            while (reloadKey.wasPressed()) {
+                CosmeticsManager.reloadAll();
+                if (client.player != null) client.player.sendMessage(new LiteralText("\u00a7fCubixora kozmetikleri yenilendi"), true);
+            }
+        });
+
+        LivingEntityFeatureRendererRegistrationCallback.EVENT.register((entityType, entityRenderer, helper, context) -> {
+            if (entityRenderer instanceof PlayerEntityRenderer) {
+                helper.register(new CubixoraFeatureRenderer((PlayerEntityRenderer) entityRenderer, context));
+            }
+        });
+        Cubixora.LOG.info("Cubixora Cosmetics haz\u0131r (1.17.1)");
+    }
+}

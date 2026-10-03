@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.52
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:quicksand.ttf",
+      "size": 7.76,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.39
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

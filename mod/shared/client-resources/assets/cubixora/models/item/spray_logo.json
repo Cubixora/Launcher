@@ -1,0 +1,5 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": { "layer0": "cubixora:item/spray_logo" },
+  "display": { "fixed": { "rotation": [0, 180, 0], "translation": [0, 0, 0], "scale": [2, 2, 2] } }
+}

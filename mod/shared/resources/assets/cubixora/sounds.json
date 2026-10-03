@@ -1,0 +1,5 @@
+{
+  "intro": { "category": "master", "sounds": [ { "name": "cubixora:intro", "stream": false } ] },
+  "rain": { "category": "master", "sounds": [ { "name": "cubixora:rain", "stream": true } ] },
+  "thunder": { "category": "master", "sounds": [ { "name": "cubixora:thunder", "stream": false } ] }
+}

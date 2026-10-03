@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; img-src 'self' data: blob: https:; media-src 'self' data: blob:; connect-src 'self' data: blob:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'" />
+  <title>Cubixora Launcher</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="ui.css" />
+</head>
+<body>
+  <canvas id="bg"></canvas>
+
+  <!-- Açılış animasyonu -->
+  <div id="splash">
+    <div class="splash-inner">
+      <img src="../assets/logo-white.png" class="splash-logo" alt="" />
+      <div class="splash-word" id="splashWord"></div>
+      <div class="splash-line"><span></span></div>
+    </div>
+  </div>
+
+  <!-- Başlık çubuğu -->
+  <header class="titlebar">
+    <div class="tb-brand"><img src="../assets/logo-white.png" alt="" /> <span>CUBIXORA</span></div>
+    <div class="tb-drag"></div>
+    <div class="tb-buttons">
+      <button data-win="minimize" title="Küçült"><svg viewBox="0 0 12 12"><path d="M2 6h8" /></svg></button>
+      <button data-win="maximize" title="Büyüt"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" /></svg></button>
+      <button data-win="close" class="close" title="Kapat"><svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6" /></svg></button>
+    </div>
+  </header>
+
+  <!-- Giriş / kayıt ekranı -->
+  <section id="login" class="hidden">
+    <div class="auth">
+      <div class="auth-hero">
+        <div class="auth-brand">
+          <img src="../assets/logo-white.png" alt="" />
+          <div><b>CUBIXORA</b><span>LAUNCHER</span></div>
+        </div>
+
+        <div class="auth-copy">
+          <div class="auth-eyebrow"><i></i>BLOK BLOK, SENİN DÜNYAN</div>
+          <h1>Minecraft'ı <span class="outline">kendi</span><br />kurallarınla oyna.</h1>
+          <p>Profillerini ayır, modlarını tek tıkla kur; doğru Java'yı ve sürüm dosyalarını Cubixora halletsin.</p>
+        </div>
+
+        <div class="auth-features">
+          <div class="feat"><div class="feat-ic"><svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7z" /><path d="M3 7l9 5 9-5M12 12v10" /></svg></div>
+            <div><b>Ayrı profiller</b><span>Her profilin kendi sürümü, modları ve dünyaları.</span></div></div>
+          <div class="feat"><div class="feat-ic"><svg viewBox="0 0 24 24"><path d="M14 3h7v7M10 21H3v-7M21 3l-8 8M3 21l8-8" /></svg></div>
+            <div><b>Fabric ve Modrinth</b><span>Modları ara, bağımlılıklarıyla birlikte kur.</span></div></div>
+          <div class="feat"><div class="feat-ic"><svg viewBox="0 0 24 24"><path d="M6 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z" /><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M9 3c0 1.5 1 1.5 1 3M13 3c0 1.5 1 1.5 1 3" /></svg></div>
+            <div><b>Otomatik Java</b><span>Her sürüm için doğru Java kendiliğinden iner.</span></div></div>
+          <div class="feat"><div class="feat-ic"><svg viewBox="0 0 24 24"><path d="M5 3l14 9-14 9z" /></svg></div>
+            <div><b>Tek tıkla oyna</b><span>Profilini seç, OYNA'ya bas, gerisi hazır.</span></div></div>
+        </div>
+      </div>
+
+      <div class="auth-side">
+        <div class="auth-card" id="authCard" data-view="login">
+          <div class="auth-tabs">
+            <button type="button" data-view="login" class="active">Giriş yap</button>
+            <button type="button" data-view="register">Kayıt ol</button>
+            <div class="auth-tabs-ink"></div>
+          </div>
+
+          <div class="auth-views">
+            <!-- GİRİŞ -->
+            <form class="auth-view active" id="loginForm" data-view="login" autocomplete="off" novalidate>
+              <h2>Tekrar hoş geldin</h2>
+              <p class="auth-sub">Profillerine ve dünyalarına kaldığın yerden devam et.</p>
+              <label class="fld"><span id="liLabel">E-posta veya kullanıcı adı</span>
+                <input class="input" id="liLogin" placeholder="ornek@mail.com" spellcheck="false" /></label>
+              <label class="fld"><span>Şifre</span>
+                <div class="pw"><input class="input" id="liPass" type="password" placeholder="••••••••" />
+                  <button type="button" class="pw-eye" tabindex="-1" title="Göster/gizle"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg></button></div></label>
+              <button type="button" class="auth-forgot" id="forgotBtn">Şifremi unuttum</button>
+              <button type="submit" class="btn btn-primary btn-block" id="liBtn">Giriş yap</button>
+              <div class="auth-switch">Hesabın yok mu? <button type="button" data-go="register">Kayıt ol</button></div>
+            </form>
+
+            <!-- KAYIT -->
+            <form class="auth-view" id="registerForm" data-view="register" autocomplete="off" novalidate>
+              <h2>Cubixora hesabı oluştur</h2>
+              <p class="auth-sub">Hesabın anında oluşur, kullanıcı adın oyun içi adın olur.</p>
+              <label class="fld"><span>Kullanıcı adı</span>
+                <input class="input" id="rgName" maxlength="16" placeholder="Minecraft'taki adın" spellcheck="false" /></label>
+              <label class="fld"><span>E-posta</span>
+                <input class="input" id="rgMail" type="email" placeholder="ornek@mail.com" spellcheck="false" /></label>
+              <div class="fld-row">
+                <label class="fld"><span>Şifre</span>
+                  <div class="pw"><input class="input" id="rgPass" type="password" placeholder="En az 6 karakter" />
+                    <button type="button" class="pw-eye" tabindex="-1" title="Göster/gizle"><svg viewBox="0 0 24 24"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg></button></div></label>
+                <label class="fld"><span>Şifre tekrarı</span>
+                  <input class="input" id="rgPass2" type="password" placeholder="••••••••" /></label>
+              </div>
+              <button type="submit" class="btn btn-primary btn-block" id="rgBtn">Hesap oluştur</button>
+              <div class="auth-switch">Zaten hesabın var mı? <button type="button" data-go="login">Giriş yap</button></div>
+            </form>
+          </div>
+
+          <div class="login-or"><span>veya şununla devam et</span></div>
+          <div class="social">
+            <button type="button" class="soc" data-provider="microsoft" title="Microsoft ile giriş (Minecraft hesabı)">
+              <svg viewBox="0 0 24 24" class="fill"><rect x="2" y="2" width="9.5" height="9.5" fill="#f25022" /><rect x="12.5" y="2" width="9.5" height="9.5" fill="#7fba00" /><rect x="2" y="12.5" width="9.5" height="9.5" fill="#00a4ef" /><rect x="12.5" y="12.5" width="9.5" height="9.5" fill="#ffb900" /></svg>
+              <span>Microsoft</span></button>
+            <button type="button" class="soc" data-provider="google" title="Google ile giriş">
+              <svg viewBox="0 0 24 24" class="fill"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.4h6.5a5.6 5.6 0 0 1-2.4 3.6v3h3.9c2.2-2.1 3.5-5.1 3.5-8.7z" /><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3c-1.1.7-2.5 1.2-4.1 1.2-3.1 0-5.8-2.1-6.7-5H1.3v3.1A12 12 0 0 0 12 24z" /><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6h-4a12 12 0 0 0 0 10.8z" /><path fill="#EA4335" d="M12 4.8c1.8 0 3.3.6 4.6 1.8l3.4-3.4A12 12 0 0 0 1.3 6.6l4 3.1c.9-2.9 3.6-4.9 6.7-4.9z" /></svg>
+              <span>Google</span></button>
+          </div>
+          <p class="auth-note">Microsoft ile girersen satın aldığın Minecraft hesabınla oynarsın. Diğer yöntemlerde oyuna Cubixora kullanıcı adınla girersin.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Uygulama -->
+  <div id="app" class="hidden">
+    <!-- üst çubuk -->
+    <div class="topbar">
+      <div class="tb-left">
+        <span class="online-dot"></span><span id="onlineCount">0 çevrimiçi</span>
+        <span class="tb-page" id="tbPage">Ana Sayfa</span>
+      </div>
+      <div class="tb-right">
+        <div class="update-pill hidden" id="updatePill" title="Yeni sürüm hazır">
+          <svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5" /></svg><span>Güncellemeyi uygula</span>
+        </div>
+        <button class="coin-pill link-pill hidden" id="linkPill" title="Coin, arkadaş ve mağaza için hesabını bağla"><b>Hesabı bağla</b></button>
+        <button class="coin-pill" id="coinPill" title="Coin · Coin al"><i class="coin-ic">C</i><b id="coinCount">0</b></button>
+        <button class="bell" id="bellBtn" title="Bildirimler"><svg viewBox="0 0 24 24"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0" /></svg><span class="bell-dot hidden" id="bellDot"></span></button>
+        <button class="me-btn" id="meBtn"><span class="ava-wrap"><img id="meAvatar" alt="" /><span class="st-dot" id="meDot"></span></span><b id="meName">Oyuncu</b><svg viewBox="0 0 24 24" class="chev"><path d="M6 9l6 6 6-6" /></svg></button>
+      </div>
+      <!-- bildirimler -->
+      <div class="pop notif-pop hidden" id="notifPop">
+        <div class="pop-title">Bildirimler</div>
+        <div id="notifList" class="notif-list"></div>
+      </div>
+      <!-- kullanıcı menüsü -->
+      <div class="pop me-pop hidden" id="mePop">
+        <div class="me-card">
+          <div class="ava-wrap big"><img id="mePopAvatar" alt="" /><span class="st-dot" id="mePopDot"></span></div>
+          <b id="mePopName">Oyuncu</b><span id="mePopHandle">@oyuncu</span>
+        </div>
+        <div class="pop-sec">Durum</div>
+        <div class="status-grid" id="statusGrid">
+          <button data-s="online"><i class="st online"></i>Çevrimiçi</button>
+          <button data-s="idle"><i class="st idle"></i>Boşta</button>
+          <button data-s="dnd"><i class="st dnd"></i>Rahatsız Etme</button>
+          <button data-s="invisible"><i class="st offline"></i>Görünmez</button>
+        </div>
+        <div class="pop-line"></div>
+        <button class="pop-item" id="mpProfile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>Profilim</button>
+        <button class="pop-item" id="mpSettings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg>Ayarlar</button>
+        <button class="pop-item danger" id="mpLogout"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>Çıkış Yap</button>
+      </div>
+    </div>
+
+    <nav class="sidebar">
+      <div class="nav-indicator"></div>
+      <button class="nav-item active" data-page="home" title="Ana Sayfa">
+        <svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /></svg><span>Ana Sayfa</span>
+      </button>
+      <button class="nav-item" data-page="servers" title="Sunucular">
+        <svg viewBox="0 0 24 24"><rect x="2" y="6" width="20" height="12" rx="4" /><path d="M7 10v4M5 12h4" /><circle cx="15.5" cy="11" r="1" /><circle cx="18" cy="13.5" r="1" /></svg><span>Sunucular</span>
+      </button>
+      <button class="nav-item" data-page="profiles" title="Profiller">
+        <svg viewBox="0 0 24 24"><path d="M12 2l9 5v10l-9 5-9-5V7z" /><path d="M3 7l9 5 9-5M12 12v10" /></svg><span>Profiller</span>
+      </button>
+      <button class="nav-item" data-page="content" title="Modlar, doku paketleri, shaderlar">
+        <svg viewBox="0 0 24 24"><path d="M10 4a2 2 0 1 1 4 0v1h4a1 1 0 0 1 1 1v4h1a2 2 0 1 1 0 4h-1v4a1 1 0 0 1-1 1h-4v-1a2 2 0 1 0-4 0v1H6a1 1 0 0 1-1-1v-4h1a2 2 0 1 0 0-4H5V6a1 1 0 0 1 1-1h4z" /></svg><span>İçerik</span>
+      </button>
+      <button class="nav-item" data-page="cosmetics" title="Kozmetik">
+        <svg viewBox="0 0 24 24"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.9 1.8-1.9 0-.5-.2-.9-.5-1.3-.3-.3-.5-.8-.5-1.3 0-1 .8-1.8 1.8-1.8H17a4 4 0 0 0 4-4C21 6.6 17 3 12 3z" /><circle cx="7.5" cy="11" r="1.2" /><circle cx="10.5" cy="7.2" r="1.2" /><circle cx="15" cy="7.5" r="1.2" /></svg><span>Kozmetik</span>
+      </button>
+      <button class="nav-item" data-page="shop" title="Mağaza">
+        <svg viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4zM3 6h18M16 10a4 4 0 0 1-8 0" /></svg><span>Mağaza</span>
+      </button>
+      <button class="nav-item" data-page="inventory" title="Envanter">
+        <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z" /><path d="M3 8l9 5 9-5M12 13v8M7.5 5.5l9 5" /></svg><span>Envanter</span>
+      </button>
+      <button class="nav-item" data-page="news" title="Haberler">
+        <svg viewBox="0 0 24 24"><path d="M3 11v2a1 1 0 0 0 1 1h2l5 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" /></svg><span>Haberler</span>
+      </button>
+      <button class="nav-item" data-page="quests" title="Görevler">
+        <svg viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z" /><path d="M7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3" /></svg><span>Görevler</span>
+      </button>
+      <button class="nav-item hidden" data-page="admin" id="navAdmin" title="Admin paneli">
+        <svg viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5-3.4 8.7-8 10-4.6-1.3-8-5-8-10V6z" /><path d="M9 12l2 2 4-4" /></svg><span>Admin</span>
+      </button>
+      <div class="nav-spacer"></div>
+      <button class="nav-item" id="navSettings" title="Ayarlar">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" /></svg><span>Ayarlar</span>
+      </button>
+      <div class="build-tag" id="buildTag"></div>
+    </nav>
+
+    <main class="content">
+      <!-- ANA SAYFA -->
+      <section class="page active" data-page="home">
+        <div class="hero" id="hero">
+          <div class="hero-bg" id="heroBg"></div>
+          <div class="hero-shade"></div>
+          <div class="hero-play">
+            <div class="pick" id="pick">
+              <button class="pick-btn" id="pickBtn" title="Profil seç">
+                <span class="pick-ic" id="pickIc">⛏️</span>
+                <span class="pick-txt"><b id="pickName">Profil</b><small id="pickMeta"></small></span>
+                <svg viewBox="0 0 24 24" class="pick-chev"><path d="M6 15l6-6 6 6" /></svg>
+              </button>
+              <div class="pick-menu hidden" id="pickMenu"></div>
+            </div>
+            <div class="play-row"><button class="play-btn" id="playBtn"><span class="play-label">OYUNU BAŞLAT</span><span class="play-clip"><span class="play-shine"></span></span></button><button class="stop-btn" id="stopBtn" title="Hazırlanmayı durdur" aria-label="Hazırlanmayı durdur"><svg viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="2.5"/></svg><span>DURDUR</span></button></div>
+            <div class="play-info">
+              <div class="play-stage" id="playStage">Hazır</div>
+              <div class="progress"><div class="progress-fill" id="progressFill"></div></div>
+            </div>
+          </div>
+          <div class="hero-tools">
+            <button class="icon-btn glass" id="heroFolder" title="Profil klasörünü aç"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg></button>
+            <button class="icon-btn glass" id="heroLog" title="Oyun günlüğü"><svg viewBox="0 0 24 24"><path d="M4 17l6-6-6-6M12 19h8" /></svg></button>
+            <button class="icon-btn glass" id="heroEdit" title="Profil ayarları"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" /><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" /></svg></button>
+          </div>
+        </div>
+
+        <div class="home-body">
+          <div class="sec-head"><h2>Partner Sunucular</h2></div>
+          <div class="partners" id="partners"><div class="muted">Henüz partner sunucu yok.</div></div>
+
+          <div class="installed card" id="installed">
+            <div class="inst-head">
+              <button class="inst-toggle" id="instToggle"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" /></svg><b>Yüklü İçerik</b><span class="badge" id="instCount">0/0</span></button>
+              <div class="grow"></div>
+              <span class="muted" id="instProfile"></span>
+            </div>
+            <div class="inst-body" id="instBody">
+              <div class="inst-bar">
+                <div class="seg small" id="instTabs">
+                  <button data-t="mod" class="active"><svg viewBox="0 0 24 24"><path d="M10 4a2 2 0 1 1 4 0v1h4a1 1 0 0 1 1 1v4h1a2 2 0 1 1 0 4h-1v4a1 1 0 0 1-1 1h-4v-1a2 2 0 1 0-4 0v1H6a1 1 0 0 1-1-1v-4h1a2 2 0 1 0 0-4H5V6a1 1 0 0 1 1-1h4z" /></svg>Modlar</button>
+                  <button data-t="resourcepack"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5z" /></svg>Doku Paketleri</button>
+                  <button data-t="shader"><svg viewBox="0 0 24 24"><path d="M12 2l10 5-10 5L2 7zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>Shaderlar</button>
+                </div>
+                <div class="search small"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M21 21l-5-5" /></svg><input id="instSearch" placeholder="İçerikte ara..." /></div>
+                <button class="icon-btn" id="instRefresh" title="Yenile"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5" /></svg></button>
+                <button class="icon-btn" id="instFolder" title="Klasörü aç"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></svg></button>
+                <button class="btn btn-ghost small" id="instFile" title="Bilgisayardan dosya ekle"><svg viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16" /></svg>Dosyadan</button>
+                <button class="btn btn-primary small" id="instAdd"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg>İçerik Ekle</button>
+              </div>
+              <div class="inst-list" id="instList"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PROFİLLER -->
+      <section class="page" data-page="servers">
+        <div class="page-head sv-head">
+          <div><h1 id="svTitle">Partner Sunucular</h1><p id="svSub">Cubixora anlaşmalı özel partner sunucuları</p></div>
+          <div class="sv-filters" id="svFilters">
+            <select class="select" id="svCat"><option value="">Tüm Kategoriler</option></select>
+            <select class="select" id="svLang"><option value="">Tüm Diller</option></select>
+            <div class="search sv-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" /></svg><input id="svSearch" placeholder="Sunucu ara..." spellcheck="false" /></div>
+          </div>
+        </div>
+        <div class="sv-grid" id="svGrid"></div>
+      </section>
+
+      <section class="page" data-page="profiles">
+        <div class="page-head">
+          <div><h1>Profiller</h1><p>Her profilin kendi sürümü, modları ve dünyaları olur.</p></div>
+          <button class="btn btn-primary" id="newProfileBtn">+ Yeni profil</button>
+        </div>
+        <div class="profile-grid" id="profileGrid"></div>
+      </section>
+
+      <!-- İÇERİK (Modrinth) -->
+      <section class="page" data-page="content">
+        <div class="page-head">
+          <div><h1>İçerik</h1><p>Modları, doku paketlerini ve shaderları Modrinth'ten tek tıkla kur.</p></div>
+          <select id="ctProfile" class="select"></select>
+        </div>
+        <div class="ct-bar">
+          <div class="seg" id="ctTabs">
+            <button data-t="mod" class="active">Modlar</button>
+            <button data-t="resourcepack">Doku Paketleri</button>
+            <button data-t="shader">Shaderlar</button>
+          </div>
+          <div class="search grow"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M21 21l-5-5" /></svg><input id="ctSearch" placeholder="Ara... (ör. sodium, faithful, complementary)" /></div>
+          <select class="select" id="ctSort"><option value="">En popüler</option><option value="relevance">En alakalı</option><option value="newest">En yeni</option><option value="updated">Son güncellenen</option><option value="follows">En çok takip</option></select>
+        </div>
+        <div class="ct-note muted hidden" id="ctNote"></div>
+        <div class="mod-list" id="ctResults"></div>
+        <button class="btn btn-ghost more" id="ctMore">Daha fazla göster</button>
+      </section>
+
+      <!-- KOZMETİK -->
+      <section class="page" data-page="cosmetics">
+        <div class="page-head">
+          <div><h1>Kozmetik</h1><p>Skinin, pelerinin ve kanatların oyunda sadece Cubixora kullananlara görünür.</p></div>
+          <div class="cos-head">
+            <span class="cos-status" id="cosStatus"></span>
+            <div class="seg" id="cosTabs"><button data-t="wardrobe" class="active">Gardrop</button><button data-t="skin">Skin</button></div>
+            <button class="btn btn-ghost" id="cosRefresh"><svg viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4M21 4v5h-5" /></svg>Yenile</button>
+          </div>
+        </div>
+        <div class="cos">
+          <div class="cos-stage">
+            <div class="cos-glow"></div>
+            <div id="cosViewer" class="cos-viewer"></div>
+            <div class="cos-controls">
+              <div class="seg small" id="cosAnim"><button data-a="wave" class="active">El salla</button><button data-a="walk">Yürü</button><button data-a="idle">Dur</button></div>
+              <button class="btn btn-ghost small" id="cosWingToggle">Kanatları kapat</button>
+            </div>
+            <div class="cos-hint" id="cosHint"></div>
+          </div>
+          <div class="cos-side">
+            <div class="cos-tab active" data-t="wardrobe">
+              <div class="cos-sec"><h3>Pelerinler</h3><div class="cos-grid" id="gridCapes"></div></div>
+              <div class="cos-sec"><h3>Kanatlar</h3><div class="cos-grid" id="gridWings"></div></div>
+              <div class="cos-sec"><h3>Şapkalar</h3><div class="cos-grid" id="gridHats"></div></div>
+              <div class="cos-sec"><h3>Uçan petler</h3><div class="cos-grid" id="gridFly"></div></div>
+              <div class="cos-sec"><h3>Efektler</h3><div class="cos-grid" id="gridFx"></div></div>
+              <div class="cos-sec">
+                <h3>Omuz arkadaşı</h3>
+                <div class="card cos-row" id="petRow">
+                  <div><b>Mini ben</b><div class="muted">Skininin küçük bir kopyası omzunda durur</div></div>
+                  <button class="btn btn-primary small hidden" id="petLock" title="Mağazada satın al"><svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.2"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg><span id="petBuy">Mağazada al</span></button>
+                  <div class="seg small" id="petSide"><button data-v="left">Sol</button><button data-v="right">Sağ</button></div>
+                  <label class="switch"><input type="checkbox" id="petOn" /><span></span></label>
+                </div>
+              </div>
+              <div class="cos-sec">
+                <h3>Animasyon ayarları</h3>
+                <div class="card">
+                  <div class="row"><div><b>Pelerin dalgalanması</b><div class="muted">0 = sabit</div></div><div class="range-wrap"><input type="range" min="0" max="2" step="0.1" id="capeWave" /><span id="capeWaveVal"></span></div></div>
+                  <div class="row"><div><b>Kanat çırpma hızı</b></div><div class="range-wrap"><input type="range" min="0.2" max="2.5" step="0.1" id="wingSpeed" /><span id="wingSpeedVal"></span></div></div>
+                  <div class="row"><div><b>Kanatlar oyunda açık başlasın</b><div class="muted">Oyunda kapatıp açmak için: K tuşu</div></div><label class="switch"><input type="checkbox" id="wingsOpenDef" /><span></span></label></div>
+                </div>
+              </div>
+            </div>
+            <div class="cos-tab" data-t="skin">
+              <div class="card cos-skin">
+                <div class="cos-skin-head"><div class="cos-badge">CX</div><div><b>Cubixora skini</b><div class="muted">PNG, 64×64 ya da 64×32 · Cubixora kullanan herkes oyunda bu skini görür</div></div></div>
+                <div class="cos-skin-actions">
+                  <label class="btn btn-primary"><svg viewBox="0 0 24 24"><path d="M12 16V4M6 10l6-6 6 6M4 20h16" /></svg>Skin yükle<input type="file" id="skinFile" accept="image/png" hidden /></label>
+                  <button class="btn btn-ghost" id="skinReset">Varsayılana dön</button>
+                </div>
+                <div class="row"><div><b>Kol modeli</b><div class="muted">İnce kollu (Alex) skinler için "İnce"</div></div><div class="seg small" id="skinModel"><button data-v="classic">Klasik</button><button data-v="slim">İnce</button></div></div>
+              </div>
+              <div class="card cos-skin" id="msSkinCard">
+                <div class="cos-skin-head"><svg viewBox="0 0 24 24" class="ms-logo"><rect x="2" y="2" width="9.5" height="9.5" fill="#f25022" /><rect x="12.5" y="2" width="9.5" height="9.5" fill="#7fba00" /><rect x="2" y="12.5" width="9.5" height="9.5" fill="#00a4ef" /><rect x="12.5" y="12.5" width="9.5" height="9.5" fill="#ffb900" /></svg><div><b>Orijinal skin (Microsoft)</b><div class="muted" id="msSkinText"></div></div></div>
+                <button class="btn btn-ghost" id="msSkinBtn">Bu skini Microsoft hesabıma da yükle</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- MAĞAZA -->
+      <section class="page" data-page="shop">
+        <div class="page-head">
+          <div><h1>Mağaza</h1><p>Coinlerinle pelerin, kanat, çerçeve ve daha fazlasını al. Coin; başarımlar, etkinlikler ve oyunda geçirdiğin zamanla kazanılır.</p></div>
+          <div class="wallet-wrap"><div class="wallet-card"><i class="coin-ic big">C</i><div><b id="shopCoins">0</b><span>coin</span></div></div><button class="btn btn-gold" id="shopBuyCoin">+ Coin Al</button></div>
+        </div>
+        <div class="seg" id="shopTabs">
+          <button data-t="all" class="active">Tümü</button><button data-t="cape">Pelerinler</button><button data-t="wings">Kanatlar</button>
+          <button data-t="pet">Omuz</button><button data-t="hat">Şapkalar</button><button data-t="fpet">Uçan Petler</button><button data-t="effect">Efektler</button><button data-t="emote">Emoteler</button><button data-t="spray">Spreyler</button><button data-t="frame">Çerçeveler</button><button data-t="color">Renk Paketleri</button><button data-t="other">Diğer</button>
+        </div>
+        <div class="shop-grid" id="shopGrid"></div>
+      </section>
+
+      <!-- ENVANTER -->
+      <section class="page" data-page="inventory">
+        <div class="page-head">
+          <div><h1>Envanter</h1><p>Sahip olduğun her şey burada. Takmak istediğine tıkla.</p></div>
+        </div>
+        <div class="seg" id="invTabs">
+          <button data-t="all" class="active">Tümü</button><button data-t="cape">Pelerinler</button><button data-t="wings">Kanatlar</button>
+          <button data-t="pet">Omuz</button><button data-t="hat">Şapkalar</button><button data-t="fpet">Uçan Petler</button><button data-t="effect">Efektler</button><button data-t="emote">Emoteler</button><button data-t="spray">Spreyler</button><button data-t="frame">Çerçeveler</button><button data-t="color">Renk Paketleri</button><button data-t="other">Diğer</button>
+        </div>
+        <div class="shop-grid" id="invGrid"></div>
+      </section>
+
+      <!-- HABERLER -->
+      <section class="page" data-page="news">
+        <div class="page-head"><div><h1>Haberler</h1><p>Güncelleme notları ve duyurular</p></div></div>
+        <div class="news-grid" id="newsGrid"></div>
+      </section>
+
+      <!-- GÖREVLER -->
+      <section class="page" data-page="quests">
+        <div class="page-head"><div><h1>Görevler &amp; Seviye</h1><p>Görevleri tamamla, coin ve LP kazan, seviye ağacında ilerle. Özel zincirleri bitirince süreli pelerin kazanırsın.</p></div></div>
+        <div id="questBody"></div>
+      </section>
+
+      <!-- ADMİN -->
+      <section class="page" data-page="admin">
+        <div class="page-head">
+          <div><h1>Admin Paneli</h1><p>Yaptığın her değişiklik tüm oyunculara yeni EXE gerekmeden anında gider.</p></div>
+        </div>
+        <div class="seg wrap" id="adTabs">
+          <button data-t="partners" class="active">Partnerler</button><button data-t="shop">Mağaza</button><button data-t="achievements">Başarımlar</button>
+          <button data-t="news">Haberler</button><button data-t="quests">Görevler</button><button data-t="notify">Bildirim</button><button data-t="reports">Hata Bildirimleri</button><button data-t="users">Kullanıcılar</button><button data-t="codes">Hediye Kodları</button>
+          <button data-t="betas">Beta</button><button data-t="branding">Discord</button><button data-t="settings">Ödül &amp; Sınırlar</button><button data-t="publish">Güncelleme Yayınla</button>
+        </div>
+        <div class="admin-body" id="adBody"></div>
+      </section>
+    </main>
+
+    <!-- SOSYAL PANEL -->
+    <aside class="social-panel" id="socialPanel">
+      <div class="sp-head">
+        <b>Sosyal</b>
+        <div class="grow"></div>
+        <button class="icon-btn small" id="spAdd" title="Arkadaş ekle"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></button>
+        <button class="icon-btn small" id="spCollapse" title="Paneli gizle"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6" /></svg></button>
+      </div>
+      <div class="pop add-pop hidden" id="addPop">
+        <input class="input" id="userSearch" placeholder="Kullanıcı ara..." spellcheck="false" />
+        <div class="user-results" id="userResults"></div>
+      </div>
+      <div class="seg full" id="spTabs">
+        <button data-t="friends" class="active">Arkadaşlar</button>
+        <button data-t="groups">Gruplar</button>
+        <button data-t="requests">İstekler <span class="badge hidden" id="reqBadge">0</span></button>
+      </div>
+      <div class="sp-body">
+        <div class="sp-tab active" data-t="friends">
+          <div class="search small"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M21 21l-5-5" /></svg><input id="friendFilter" placeholder="Ara..." /></div>
+          <div id="friendList" class="people"></div>
+        </div>
+        <div class="sp-tab" data-t="groups">
+          <div class="sp-sub"><span>GRUPLAR</span><button class="icon-btn small" id="newGroupBtn" title="Grup oluştur"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></button></div>
+          <div id="groupList" class="people"></div>
+        </div>
+        <div class="sp-tab" data-t="requests"><div id="requestList" class="people"></div></div>
+      </div>
+      <div class="sp-msgs">
+        <div class="sp-msgs-head"><b>Mesajlar</b></div>
+        <div id="recentChats" class="recent"></div>
+        <button class="btn btn-ghost btn-block" id="openChat"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>Sohbet</button>
+      </div>
+      <div class="sp-locked hidden" id="spLocked">
+        <svg viewBox="0 0 24 24"><rect x="4" y="10" width="16" height="11" rx="2" /><path d="M8 10V7a4 4 0 0 1 8 0v3" /></svg>
+        <b>Sosyal özellikler kapalı</b>
+        <p>Arkadaş ekleme, sohbet, sesli arama, coin ve mağaza için Google ya da Cubixora (e-posta) hesabıyla giriş yap.</p>
+      </div>
+    </aside>
+    <button class="sp-open hidden" id="spOpen" title="Sosyal paneli aç"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6" /></svg></button>
+  </div>
+
+  <!-- SOHBET -->
+  <div class="overlay hidden" id="chatWin">
+    <div class="chat">
+      <div class="chat-side">
+        <div class="chat-side-head"><b>Sohbet</b><div class="grow"></div><button class="icon-btn small" id="chatNewGroup" title="Grup oluştur"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" /></svg></button></div>
+        <div class="search small"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" /><path d="M21 21l-5-5" /></svg><input id="convFilter" placeholder="Sohbetlerde ara..." /></div>
+        <div class="conv-list" id="convList"></div>
+      </div>
+      <div class="chat-main">
+        <div class="chat-head" id="chatHead">
+          <div class="chat-peer" id="chatPeer"></div>
+          <div class="grow"></div>
+          <button class="icon-btn" id="chatCall" title="Sesli ara"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z" /></svg></button>
+          <button class="icon-btn" id="chatInfo" title="Grup ayarları"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" /><path d="M12 16v-4M12 8h.01" /></svg></button>
+          <button class="icon-btn" id="chatClose" title="Kapat"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button>
+        </div>
+        <div class="chat-msgs" id="chatMsgs"><div class="chat-empty"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg><b>Bir sohbet seç</b><span>Arkadaşlarınla ve gruplarınla buradan konuş.</span></div></div>
+        <div class="chat-input hidden" id="chatInput">
+          <button class="icon-btn" id="chatImage" title="Görsel gönder"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" /></svg></button>
+          <textarea id="chatText" rows="1" placeholder="Mesaj yaz..." maxlength="2000"></textarea>
+          <button class="icon-btn" id="chatEmoji" title="Emoji">😊</button>
+          <button class="icon-btn" id="chatMic" title="Sesli mesaj (basılı tut ya da tıkla)"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" /></svg></button>
+          <button class="btn btn-primary small" id="chatSend"><svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z" /></svg></button>
+          <div class="emoji-pop hidden" id="emojiPop"></div>
+          <div class="rec-bar hidden" id="recBar"><span class="rec-dot"></span><b id="recTime">0:00</b><span class="muted">Kaydediliyor...</span><div class="grow"></div><button class="btn btn-ghost small" id="recCancel">İptal</button><button class="btn btn-primary small" id="recSend">Gönder</button></div>
+        </div>
+        <div class="chat-locked hidden" id="chatLocked">Bu grupta sadece yönetici mesaj yazabilir.</div>
+      </div>
+      <div class="chat-info hidden" id="groupInfo"></div>
+    </div>
+  </div>
+
+  <!-- ARAMA -->
+  <div class="call-card hidden" id="callCard">
+    <div class="call-ava"><img id="callAvatar" alt="" /><span class="call-ring"></span></div>
+    <div class="call-txt"><b id="callName">Oyuncu</b><span id="callState">Aranıyor...</span></div>
+    <div class="call-btns">
+      <button class="call-b mute" id="callMute" title="Mikrofonu kapat"><svg viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3" /><path d="M5 10a7 7 0 0 0 14 0M12 17v5" /></svg></button>
+      <button class="call-b accept" id="callAccept" title="Aç (Ctrl+Shift+A)"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z" /></svg></button>
+      <button class="call-b end" id="callEnd" title="Kapat (Ctrl+Shift+D)"><svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z" transform="rotate(135 12 12)" /></svg></button>
+    </div>
+    <audio id="callAudio" autoplay></audio>
+  </div>
+
+  <!-- PROFİL -->
+  <div class="modal hidden" id="profileView">
+    <div class="pv" id="pvCard"></div>
+  </div>
+
+  <!-- AYARLAR -->
+  <div class="modal hidden" id="settingsWin">
+    <div class="sw">
+      <div class="sw-head"><b>Ayarlar</b><div class="grow"></div><button class="icon-btn small" id="swClose"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button></div>
+      <div class="sw-body">
+        <div class="sw-nav" id="swNav">
+          <button data-t="game" class="active">Oyun</button>
+          <button data-t="minecraft">Minecraft</button>
+          <button data-t="general">Genel</button>
+          <button data-t="account">Hesap</button>
+          <button data-t="sound">Ses</button>
+          <button data-t="storage">Depolama</button>
+          <button data-t="notifications">Bildirimler</button>
+          <button data-t="linked">Bağlı Hesaplar</button>
+          <button data-t="privacy">Gizlilik</button>
+          <button data-t="a11y">Erişilebilirlik</button>
+          <button data-t="cubixora">Cubixora Ayarları</button>
+          <button data-t="betas">Betalar</button>
+          <button data-t="log">Günlük</button>
+        </div>
+        <div class="sw-content" id="swContent"></div>
+      </div>
+      <div class="sw-foot">Cubixora Launcher <span id="swVersion"></span></div>
+    </div>
+  </div>
+
+  <!-- NICKNAME -->
+  <div class="modal hidden" id="nickWin">
+    <div class="nick">
+      <div class="nick-head"><div class="nick-ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg></div>
+        <div><b>Minecraft Nickname</b><span>Oynamak için bir nickname seç</span></div>
+        <div class="grow"></div><button class="icon-btn small" id="nickClose"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button></div>
+      <div class="nick-input"><span>@</span><input id="nickInput" maxlength="16" placeholder="Örn: Cubixora_Oyuncu" spellcheck="false" /><em id="nickCount">0/16</em></div>
+      <div class="muted">3–16 karakter · harf, rakam, alt çizgi (_) · başkasının kullandığı nickname alınamaz</div>
+      <div class="nick-actions"><button class="btn btn-ghost" id="nickCancel">İptal</button><button class="btn btn-primary" id="nickSave">Kaydet &amp; Oyna →</button></div>
+    </div>
+  </div>
+
+  <!-- ödül bildirimleri -->
+  <div id="rewardTop"></div>
+  <div id="rewardSide"></div>
+  <div id="coinWin" class="modal hidden"><div class="confirm coin-card">
+    <div class="cb-top"><div class="cb-coin"><i class="coin-ic big">C</i></div><div><small>BAKİYEN</small><b id="cbBal">0</b></div><button class="icon-btn small" id="cbClose"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" /></svg></button></div>
+    <b id="cbTitle">Coin satın al</b><p id="cbText"></p>
+    <div class="cb-steps"><span><i>1</i>Discord'a katıl</span><span><i>2</i>Ticket aç</span><span><i>3</i>Coinin yüklensin</span></div>
+    <div class="nick-actions"><button class="btn btn-ghost" id="cbShop">Mağazaya git</button><button class="btn btn-discord" id="cbGo"><svg viewBox="0 0 24 24"><path d="M19.3 5.3A17 17 0 0 0 15 4l-.5 1a15.7 15.7 0 0 0-5 0L9 4a17 17 0 0 0-4.3 1.3C2 9.3 1.3 13.2 1.6 17a17 17 0 0 0 5.2 2.6l1.1-1.8a11 11 0 0 1-1.7-.8l.4-.3a12.2 12.2 0 0 0 10.8 0l.4.3-1.7.8 1.1 1.8a17 17 0 0 0 5.2-2.6c.4-4.4-.7-8.3-3.1-11.7zM8.7 14.7c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1zm6.6 0c-1 0-1.9-1-1.9-2.1s.8-2.1 1.9-2.1 1.9 1 1.9 2.1-.8 2.1-1.9 2.1z" fill="currentColor" stroke="none" /></svg><span id="cbBtn">Discord'a git</span></button></div>
+  </div></div>
+  <div id="confirmWin" class="modal hidden"><div class="confirm"><b id="cfTitle"></b><p id="cfText"></p><div class="nick-actions"><button class="btn btn-ghost" id="cfNo">Vazgeç</button><button class="btn btn-primary" id="cfYes">Onayla</button></div></div></div>
+  <div id="upWin" class="modal hidden"><div class="confirm up-card">
+    <b>Coin, arkadaş ve mağaza için hesabını bağla</b>
+    <p>Microsoft ile giriş yaptın, oyuna girmeye hazırsın. Coin kazanmak, arkadaş eklemek, sohbet ve mağaza için ücretsiz bir Cubixora hesabı bağla; yalnızca bir kez, yaklaşık 10 saniye. Kullanıcı adın, profillerin ve premium bağlantın aynen korunur. Bunun sebebi güvenlik: coinlerin ve arkadaşların sunucuda yalnızca senin kimliğine bağlanır, kimse hesabını taklit edemez.</p>
+    <div class="up-actions"><button class="btn btn-primary" id="upGoogle">Google ile bağla</button><button class="btn btn-ghost" id="upMailBtn">E-posta ile kaydol</button></div>
+    <form id="upForm" class="hidden" autocomplete="off">
+      <label class="fld"><span>E-posta</span><input class="input" id="upMail" type="email" placeholder="ornek@mail.com" spellcheck="false" /></label>
+      <label class="fld"><span>Şifre</span><input class="input" id="upPass" type="password" placeholder="en az 6 karakter" /></label>
+      <label class="fld"><span>Şifre tekrar</span><input class="input" id="upPass2" type="password" /></label>
+      <small class="up-note">Kullanıcı adın Microsoft adınla aynı olacak.</small>
+      <button class="btn btn-primary" id="upGo" type="submit">Hesabı oluştur</button>
+    </form>
+    <div class="nick-actions"><button class="btn btn-ghost" id="upClose">Şimdi değil</button></div>
+  </div></div>
+  <div id="imgView" class="modal hidden"><img id="imgViewImg" alt="" /></div>
+
+  <!-- Profil düzenleme penceresi -->
+  <div class="modal hidden" id="profileModal">
+    <div class="modal-card">
+      <h2 id="pmTitle">Yeni profil</h2>
+      <label>Profil adı<input class="input" id="pmName" maxlength="32" placeholder="ör. Survival" /></label>
+      <div class="field">
+        <span>Simge</span>
+        <div class="icon-pick" id="pmIcons"></div>
+      </div>
+      <label>Minecraft sürümü<select class="select" id="pmVersion"></select></label>
+      <div class="field">
+        <span>Yükleyici</span>
+        <div class="seg" id="pmLoader">
+          <button data-v="cubixora" class="cx-opt">⚡ Cubixora</button>
+          <button data-v="vanilla" class="active">Vanilla</button>
+          <button data-v="fabric">Fabric</button>
+        </div>
+        <small class="pm-hint hidden" id="pmCxHint">Fabric + otomatik performans modları (Sodium, Lithium, FerriteCore, Entity Culling, ImmediatelyFast, ModernFix, Dynamic FPS…). Seçtiğin sürümde olanlar kurulur, mod ekleyebilirsin.</small>
+      </div>
+      <label class="hidden" id="pmLoaderVerWrap">Fabric sürümü<select class="select" id="pmLoaderVer"></select></label>
+      <div class="field">
+        <span>Bellek: <b id="pmRamVal"></b></span>
+        <input type="range" min="1" max="16" id="pmRam" />
+      </div>
+      <details>
+        <summary>Gelişmiş</summary>
+        <label>Ek JVM argümanları<input class="input" id="pmJvm" placeholder="-XX:+UseG1GC" /></label>
+        <label class="inline"><input type="checkbox" id="pmFull" /> Tam ekran başlat</label>
+      </details>
+      <div class="modal-actions">
+        <button class="btn btn-danger hidden" id="pmDelete">Sil</button>
+        <div class="grow"></div>
+        <button class="btn btn-ghost" id="pmCancel">Vazgeç</button>
+        <button class="btn btn-primary" id="pmSave">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tanıtım turu -->
+  <div id="tour" class="hidden">
+    <div class="tour-hole" id="tourHole"></div>
+    <div class="tour-card" id="tourCard">
+      <div class="tour-step" id="tourStep"></div>
+      <h3 id="tourTitle"></h3>
+      <p id="tourText"></p>
+      <div class="tour-dots" id="tourDots"></div>
+      <div class="tour-actions">
+        <button class="tour-skip" id="tourSkip">Turu atla</button>
+        <div class="grow"></div>
+        <button class="btn btn-ghost small" id="tourBack">Geri</button>
+        <button class="btn btn-primary small" id="tourNext">İleri</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toasts"></div>
+  <script src="viewer.js"></script>
+  <script src="cosmetics.js"></script>
+  <script src="tour.js"></script>
+  <script src="app.js"></script>
+  <script src="content.js"></script>
+  <script src="social.js"></script>
+  <script src="chat.js"></script>
+  <script src="call.js"></script>
+  <script src="gamevoice.js"></script>
+  <script src="profile.js"></script>
+  <script src="store.js"></script>
+  <script src="news.js"></script>
+  <script src="quests.js"></script>
+  <script src="settings.js"></script>
+  <script src="admin.js"></script>
+  <script src="servers.js"></script>
+</body>
+</html>

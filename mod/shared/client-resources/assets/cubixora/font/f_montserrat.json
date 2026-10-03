@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.38
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:montserrat.ttf",
+      "size": 7.31,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.37
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+pluginManagement {
+    repositories {
+        maven { name = 'Fabric'; url = 'https://maven.fabricmc.net/' }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+rootProject.name = 'cubixora-cosmetics'
+// Her v* klasörü bir Minecraft sürüm aralığı için ayrı mod üretir; ortak kod "shared" klasöründe.
+apply from: 'settings.include.gradle'

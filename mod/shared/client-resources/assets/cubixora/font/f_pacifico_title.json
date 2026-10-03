@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 3.4
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:pacifico.ttf",
+      "size": 9.55,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.53
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

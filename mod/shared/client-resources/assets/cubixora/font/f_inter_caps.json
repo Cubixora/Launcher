@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.15
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:inter.ttf",
+      "size": 6.26,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.18
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

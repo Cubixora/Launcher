@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.82
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:poppins.ttf",
+      "size": 7.93,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.44
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+# GitHub'a yalnız bu dosya ve klasörler gider; geri kalan her şey (bat dosyaları,
+# kurulum çıktıları, araçlar, zip'ler, gizli anahtarlar) bilgisayarda kalır.
+/*
+!/.gitignore
+!/LICENSE
+!/README.md
+!/package.json
+!/src/
+!/mod/
+
+# --- GİZLİ: asla GitHub'a gitmesin
+src/oauth.json
+*.key
+*.pem
+.env
+.env.*
+
+# --- derleme çıktıları
+src/mod-jars/**/*.jar
+**/build/
+**/.gradle/
+**/run/
+**/out/
+**/bin/
+*.class
+*.jar
+!mod/gradle/wrapper/gradle-wrapper.jar
+*.log
+*.zip
+
+# --- editör / sistem
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini

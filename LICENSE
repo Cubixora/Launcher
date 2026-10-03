@@ -1,0 +1,65 @@
+# CUBIXORA LAUNCHER SOURCE-AVAILABLE LICENSE
+
+Copyright (c) 2026 Cubixora. All rights reserved.
+
+## 1. DEFINITIONS
+"Software" refers to the Cubixora Launcher and Cubixora Client mod source code, compiled binaries, assets and documentation contained in this repository.
+"Author" refers to the copyright holder, Cubixora.
+
+## 2. GRANT OF LICENSE
+You may view, download, compile and run the Software solely for personal, non-commercial and educational purposes.
+
+## 3. RESTRICTIONS
+You may not:
+- **Redistribute** the Software or any modified version (source code or binaries) to third parties in any form.
+- **Use it commercially**: sell, rent, license or otherwise exploit the Software or derivative works for financial gain.
+- **Sublicense** or delegate the rights granted by this License.
+- **Rebrand** the Software or distribute it under another name or brand.
+- Use the Software to connect to, abuse or impersonate Cubixora services, accounts or infrastructure.
+
+## 4. DERIVATIVE WORKS
+You may modify the source code only for your own personal use. Modifications remain subject to this License and may not be shared, distributed or sold.
+
+## 5. THIRD-PARTY COMPONENTS
+Third-party libraries keep their own licenses (see the CmlLib notice at the end of this file and each dependency's license). Minecraft is a trademark of Mojang Studios; this project is not affiliated with Mojang or Microsoft.
+
+## 6. NO WARRANTY
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY.
+
+---
+
+# CUBIXORA LAUNCHER KAYNAK KODU KULLANIM LİSANSI
+
+Telif Hakkı (c) 2026 Cubixora. Tüm hakları saklıdır.
+
+1. **İzin:** Yazılımı yalnızca kişisel, ticari olmayan ve eğitim amaçlı inceleyebilir, indirebilir, derleyebilir ve çalıştırabilirsiniz.
+2. **Yasaklar:** Kaynak kodun ya da derlenmiş halinin (değiştirilmiş olsa bile) yeniden dağıtılması, satılması, ticari amaçla kullanılması, alt lisanslanması, başka bir isim/marka altında yayınlanması ve Cubixora hizmetlerini kötüye kullanmak için kullanılması yasaktır.
+3. **Değişiklikler:** Kodu yalnızca kendi kişisel kullanımınız için değiştirebilirsiniz; değişiklikler paylaşılamaz.
+4. **Üçüncü taraf bileşenler** kendi lisanslarına tabidir. Minecraft, Mojang Studios'un ticari markasıdır; bu proje Mojang veya Microsoft ile bağlantılı değildir.
+5. **Garanti yoktur:** Yazılım "olduğu gibi" sunulur.
+
+---
+
+# THIRD-PARTY NOTICE: CmlLib
+
+MIT License
+
+Copyright (c) 2024 CmlLib
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

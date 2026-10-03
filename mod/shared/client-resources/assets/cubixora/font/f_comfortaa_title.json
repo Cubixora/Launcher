@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.85
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:comfortaa.ttf",
+      "size": 8.03,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.45
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

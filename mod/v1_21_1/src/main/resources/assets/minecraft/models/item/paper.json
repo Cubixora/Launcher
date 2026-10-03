@@ -1,0 +1,5 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": { "layer0": "minecraft:item/paper" },
+  "overrides": [ { "predicate": { "custom_model_data": 7770001 }, "model": "cubixora:item/spray_logo" } ]
+}

@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.55
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:chakra.ttf",
+      "size": 7.84,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.39
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

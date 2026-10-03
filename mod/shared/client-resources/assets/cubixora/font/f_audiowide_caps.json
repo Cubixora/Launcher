@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.22
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:audiowide.ttf",
+      "size": 6.46,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.18
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}

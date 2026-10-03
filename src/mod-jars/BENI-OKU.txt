@@ -1,0 +1,1 @@
+Bu klasorlere 3-MOD-DERLE.bat derlenmis kozmetik modunu (cubixora-cosmetics.jar) koyar.

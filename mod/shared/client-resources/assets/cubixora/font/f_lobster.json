@@ -1,0 +1,25 @@
+{
+  "providers": [
+    {
+      "type": "space",
+      "advances": {
+        " ": 2.54
+      }
+    },
+    {
+      "type": "ttf",
+      "file": "cubixora:lobster.ttf",
+      "size": 7.81,
+      "oversample": 3.0,
+      "shift": [
+        0.0,
+        -0.39
+      ],
+      "skip": " "
+    },
+    {
+      "type": "reference",
+      "id": "minecraft:default"
+    }
+  ]
+}
