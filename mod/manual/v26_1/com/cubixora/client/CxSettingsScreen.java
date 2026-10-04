@@ -75,7 +75,6 @@ public final class CxSettingsScreen extends Screen {
                 break;
             case 3:
                 form.button("Yazı Stili", "Oyundaki tüm yazıların stilini seç (menüler, ayarlar, HUD).", () -> CxFonts.nameOf(CxFonts.current()) + "  >", () -> open(new CxDialog.Fonts(s())));
-                form.button("İmleç", "Menülerdeki fare imlecinin tasarımı. Tıkladıkça sıradakine geçer; launcher ile eşitlenir.", () -> CxCursor.name() + "  >", CxCursor::next);
                 form.button("Vurgu rengi", "Switch, sekme ve arayüz vurgularının rengini seç.", () -> "Aç", () -> open(new CxDialog.Accent(s())));
                 form.toggle("Açılış Videosu", "Oyun ilk açıldığında Cubixora introsunu oynat.", () -> s().intro, v -> s().intro = v);
                 form.slider("Efekt Partikül Seviyesi", "", () -> s().particles, v -> s().particles = v, 0, 100, 5, CxSettingsScreen::pct);

@@ -11,7 +11,6 @@ import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 public final class CubixoraClient implements ClientModInitializer {
-    private static int cursorPoll;
     @Override
     public void onInitializeClient() {
         CosmeticsManager.init();
@@ -32,8 +31,6 @@ public final class CubixoraClient implements ClientModInitializer {
             com.cubixora.client.CxScale.sync(client);
             com.cubixora.client.CxUi.preloadStep(client);
             com.cubixora.client.CxWindow.tick(client);
-            com.cubixora.client.CxCursor.frame();
-            if (++cursorPoll >= 40) { cursorPoll = 0; com.cubixora.client.CxCursor.poll(); }
             com.cubixora.client.CxEmote.tick(client);
             while (reloadKey.wasPressed()) {
                 CosmeticsManager.reloadAll();

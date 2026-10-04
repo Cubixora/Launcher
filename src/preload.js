@@ -79,7 +79,7 @@ contextBridge.exposeInMainWorld('cx', {
   previewState: () => invoke('admin:previewState'),
   on: (ch, fn) => {
     const allowed = ['log', 'progress', 'game-state', 'account', 'sync', 'social:me', 'social:signal', 'social:reward', 'social:quest', 'timed:expired', 'social:conn',
-      'social:error', 'app:update', 'admin:publish', 'notify:click', 'call:hotkey', 'content:optimize', 'social:presence', 'cosmetics:changed', 'voice:want', 'voice:mute', 'voice:ctl', 'voice:devices-req', 'social:banned', 'preview:state', 'social:giveaways', 'settings:cursor'];
+      'social:error', 'app:update', 'admin:publish', 'notify:click', 'call:hotkey', 'content:optimize', 'social:presence', 'cosmetics:changed', 'voice:want', 'voice:mute', 'voice:ctl', 'voice:devices-req', 'social:banned', 'preview:state', 'social:giveaways'];
     if (!allowed.includes(ch)) return;
     ipcRenderer.on(ch, (_e, data) => fn(data));
   }

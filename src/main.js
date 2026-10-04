@@ -1016,13 +1016,6 @@ function bridgeInfo() {
             await cloud.setSpray(config.account.name, data);
             return reply(200, { ok: true });
           }
-          if (req.url === '/cursor') {
-            // imleç: oyunda seçilen launcher'a, launcher'da seçilen oyuna geçer
-            if (typeof data.id === 'string' && /^[a-z0-9_]{0,24}$/.test(data.id) && data.id !== (config.settings.cursor || '')) {
-              config.settings.cursor = data.id; saveConfig(); send('settings:cursor', data.id);
-            }
-            return reply(200, { cur: config.settings.cursor || '' });
-          }
           if (req.url === '/report') {
             if (!cloud.isCloudAccount()) return reply(400, { error: 'Bildirim göndermek için Google ya da e-posta ile giriş yapmalısın.' });
             await social.submitReport({ category: data.category, text: data.text, version: data.version });
@@ -1089,7 +1082,7 @@ async function writeClientJson(p, gameDir) {
   }
   await fsp.mkdir(path.dirname(f), { recursive: true });
   const br = await bridgeInfo();
-  await fsp.writeFile(f, JSON.stringify({ enabled: true, name: config.account ? config.account.name : '', coins, plus, friends, news, bridge: br, cursor: config.settings.cursor || '' }));
+  await fsp.writeFile(f, JSON.stringify({ enabled: true, name: config.account ? config.account.name : '', coins, plus, friends, news, bridge: br }));
 }
 
 // ---------------------------------------------------------------- launch

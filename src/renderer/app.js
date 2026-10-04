@@ -683,28 +683,8 @@ async function saveSetting(patch) {
   return S.settings;
 }
 // erişilebilirlik ve görünüm
-// Cubixora imleci: tek bir CSS değişkeni; seçim oyunla iki yönlü eşitlenir
-const CURSOR_HOT = { yildiz: [4, 4] };
-function cursorCss(id) {
-  const [x, y] = CURSOR_HOT[id] || [1, 1], u = `../assets/cursors/${id}`;
-  return `-webkit-image-set(url("${u}.png") 1x, url("${u}@2x.png") 2x) ${x} ${y}`;
-}
-let curApplied = null;
-function applyCursor(id) {
-  id = /^[a-z0-9_]{1,24}$/.test(id || '') ? id : '';
-  if (id === curApplied) return;
-  curApplied = id;
-  document.body.classList.toggle('cx-cursor', !!id);
-  if (id) document.body.style.setProperty('--cx-cur', `${cursorCss(id)}, auto`); else document.body.style.removeProperty('--cx-cur');
-}
-if (typeof cx !== 'undefined') cx.on('settings:cursor', (id) => {
-  if (S.settings) S.settings.cursor = id;
-  applyCursor(id);
-  if (typeof Settings !== 'undefined' && Settings.refreshCursor) Settings.refreshCursor();
-});
 function applyLook() {
   const s = S.settings || {};
-  applyCursor(s.cursor);
   document.body.classList.toggle('no-anim', s.animations === false);
   const a = s.a11y || {};
   document.documentElement.style.fontSize = `${a.fontScale || 100}%`;
