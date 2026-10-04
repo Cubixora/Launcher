@@ -721,15 +721,29 @@ module.exports = function createSocial(ctx) {
     }
   }
 
+  // privates belgesine yazma kotası: dakikalık sayaçlar (launcher/oyun süresi) her dakika yazılmaz,
+  // en geç 5 dk'da bir toplu yazılır; görev/başarım tamamlanınca 2,5 sn içinde, launcher kapanırken de hemen yazılır
+  let privPend = null, privTimer = null, privUrgent = false;
+  function privSave(fields, urgent) {
+    privPend = { ...(privPend || {}), ...fields };
+    if (urgent && !privUrgent) { privUrgent = true; clearTimeout(privTimer); privTimer = null; }
+    if (!privTimer) privTimer = setTimeout(flushPriv, urgent ? 2500 : 5 * 60 * 1000);
+  }
+  function flushPriv() {
+    clearTimeout(privTimer); privTimer = null; privUrgent = false;
+    const uid = me(), data = privPend; privPend = null;
+    if (!uid || !data) return Promise.resolve();
+    return db.patch(`privates/${uid}`, data).catch(() => {});
+  }
   // istatistikler (hedefli başarımlar)
-  let statTimer = null;
   function bumpStat(name, n, absolute) {
     if (!me() || !cache.privates) return;
     questBump(name, n, absolute);
     const st = cache.privates.stats = cache.privates.stats || {};
-    st[name] = absolute ? Math.max(st[name] || 0, n) : (st[name] || 0) + n;
-    clearTimeout(statTimer);
-    statTimer = setTimeout(() => db.patch(`privates/${me()}`, { stats: st }).catch(() => {}), 3000);
+    const prev = st[name] || 0;
+    st[name] = absolute ? Math.max(prev, n) : prev + n;
+    if (st[name] === prev) return;   // değişmediyse yazma
+    privSave({ stats: st }, false);
     achievements().then((list) => {
       for (const [id, a] of Object.entries(list)) if (a.stat === name && a.goal && st[name] >= a.goal) claimAchievement(id).catch(() => {});
     });
@@ -860,17 +874,18 @@ module.exports = function createSocial(ctx) {
   const TIERS = [['Bronz', 1], ['Gümüş', 10], ['Altın', 25], ['Platin', 50], ['Elmas', 100], ['Usta', 150], ['Efsane', 200]];
   const quests = async () => ((await remote('quests', { events: {} }, 5 * 60 * 1000)) || { events: {} });
   const eventLive = (e) => e && e.active !== false && (!e.startsAt || now() >= e.startsAt) && (!e.endsAt || now() < e.endsAt);
-  let qpTimer = null;
   async function questBump(stat, n = 1, absolute = false) {
     if (!me() || !cache.privates) return;
     const [cfg, gws] = await Promise.all([quests().catch(() => null), giveaways().catch(() => [])]);
     const qp = cache.privates.qp = cache.privates.qp || {};
     const gp = cache.privates.gp = cache.privates.gp || {};
     const upd = (o) => { const prev = o[stat] || 0, next = absolute ? Math.max(prev, n) : prev + n; if (next === prev) return null; o[stat] = next; return [prev, next]; };
-    let changed = false, gwChanged = false;
+    let changed = false, gwChanged = false, crossed = false;
     for (const [eid, e] of Object.entries((cfg && cfg.events) || {})) {
-      if (!eventLive(e) || !Object.values(e.steps || {}).some((s) => s.stat === stat)) continue;
-      if (upd(qp[eid] = qp[eid] || {})) changed = true;
+      const steps = Object.values(e.steps || {}).filter((s) => s.stat === stat);
+      if (!eventLive(e) || !steps.length) continue;
+      const r = upd(qp[eid] = qp[eid] || {});
+      if (r) { changed = true; if (steps.some((st) => r[0] < (Number(st.goal) || 1) && r[1] >= (Number(st.goal) || 1))) crossed = true; }
     }
     // çekiliş koşulları: ilerleme çekiliş açıkken sayılır; bir koşul bitince launcher'da ve oyunda bildirim çıkar
     for (const g of gws) {
@@ -882,12 +897,11 @@ module.exports = function createSocial(ctx) {
       const r = upd(o);
       if (!r) continue;
       gwChanged = true;
-      for (const c of conds) if (r[0] < c.goal && r[1] >= c.goal) gwToast('GÖREV TAMAMLANDI', c.title || STAT_TITLE(c.stat, c.goal));
+      for (const c of conds) if (r[0] < c.goal && r[1] >= c.goal) { crossed = true; gwToast('GÖREV TAMAMLANDI', c.title || STAT_TITLE(c.stat, c.goal)); }
       if (!wasReady && gwReady(g, gp)) setTimeout(() => gwToast('ÇEKİLİŞE KATILABİLİRSİN', `${g.title}: Görevler sayfasından katıl`, 'gwReady'), 1200);
     }
     if (!changed && !gwChanged) return;
-    clearTimeout(qpTimer);
-    qpTimer = setTimeout(() => db.patch(`privates/${me()}`, { qp, gp }).catch(() => {}), 2500);
+    privSave({ qp, gp }, crossed);
     if (changed) send('social:quest', {});
     if (gwChanged) send('social:giveaways', {});
   }
@@ -919,6 +933,7 @@ module.exports = function createSocial(ctx) {
   }
   async function reward(kind, a) { send('social:reward', { kind, ...a }); }
   async function claimQuestStep(eid, sid) {
+    await flushPriv();   // bekleyen ilerleme önce kaydedilsin
     const uid = me(); if (!uid) throw new Error('Giriş yapmalısın.');
     const cfg = await remote('quests', { events: {} }, 5 * 60 * 1000);
     const e = (cfg.events || {})[eid], s = e && (e.steps || {})[sid];
@@ -942,6 +957,7 @@ module.exports = function createSocial(ctx) {
     return { coins: s.coins || 0, lp: s.lp || 0 };
   }
   async function claimQuestReward(eid) {
+    await flushPriv();   // bekleyen ilerleme önce kaydedilsin
     const uid = me(); if (!uid) throw new Error('Giriş yapmalısın.');
     const cfg = await remote('quests', { events: {} }, 5 * 60 * 1000);
     const e = (cfg.events || {})[eid];
@@ -1244,6 +1260,7 @@ module.exports = function createSocial(ctx) {
     return { list: out, serverNow: now() };
   }
   async function joinGiveaway(gid) {
+    await flushPriv();   // bekleyen ilerleme önce kaydedilsin
     const uid = me(); if (!uid) throw new Error('Çekilişe katılmak için giriş yapmalısın.');
     const g = (await giveaways(true)).find((x) => x.id === gid);
     if (!g || !gwVisible(g)) throw new Error('Bu çekiliş artık yok.');
@@ -1393,11 +1410,12 @@ module.exports = function createSocial(ctx) {
     if (stopListen) stopListen(); stopListen = null;
     if (stopPresence) stopPresence(); stopPresence = null;
     clearInterval(beatTimer); clearInterval(hourTimer); clearInterval(sweepTimer); clearInterval(minuteTimer);
+    const flushed = flushPriv();
     const uid = me();
     const off = uid ? db.rtSet(`presence/${uid}`, { s: 'offline', t: { '.sv': 'timestamp' }, g: '' }).catch(() => {}) : Promise.resolve();
     cache.profile = cache.wallet = cache.inventory = cache.privates = null; claimed = null;
     friendCache = { list: [], incoming: [], outgoing: [], at: 0 };
-    return off;
+    return Promise.all([off, flushed]);
   }
 
   return {

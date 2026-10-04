@@ -348,6 +348,7 @@ module.exports = function createCloud(ctx) {
   }
 
   const push = () => queue(pushNow);
+  const lastPushed = {};
   async function pushNow() {
     {
       if (!isCloudAccount()) return;
@@ -355,7 +356,11 @@ module.exports = function createCloud(ctx) {
       try {
         const snap = await markManifest();
         const a = config.account;
-        await setDoc(`users/${a.id}`, { username: a.name, uuid: a.uuid, data: JSON.stringify(snap), updated: Date.now() });
+        const body = JSON.stringify(snap);
+        if (body !== lastPushed[a.id]) {   // değişiklik yoksa buluta yazma (yazma kotası)
+          await setDoc(`users/${a.id}`, { username: a.name, uuid: a.uuid, data: body, updated: Date.now() });
+          lastPushed[a.id] = body;
+        }
         config.sync = { ...(config.sync || {}), dirty: false, last: Date.now() };
         saveConfig();
         send('sync', { state: 'done', last: config.sync.last, local: countLocal(snap) });
@@ -375,7 +380,7 @@ module.exports = function createCloud(ctx) {
     config.sync = { ...(config.sync || {}), dirty: true };
     saveConfig();
     clearTimeout(pushTimer);
-    pushTimer = setTimeout(push, 1500);
+    pushTimer = setTimeout(push, 8000);   // art arda değişiklikler tek yazmada birleşir
   }
 
   // pull(): { ready, done } döner. ready = profiller buluttan alınıp uygulandı (giriş bunu bekler),
