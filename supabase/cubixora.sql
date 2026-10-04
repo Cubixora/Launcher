@@ -646,7 +646,7 @@ end $$;
 do $$
 begin
   if to_regclass('realtime.messages') is not null then
-    execute 'alter table realtime.messages enable row level security';
+    -- realtime.messages tablosunda RLS Supabase tarafından zaten açıktır (sahibi biz değiliz, sadece politika ekliyoruz)
     execute 'drop policy if exists cx_rt_read on realtime.messages';
     execute $p$create policy cx_rt_read on realtime.messages for select to anon, authenticated using (
       public.fs_uid() is not null and (realtime.topic() in ('presence', 'fx') or realtime.topic() = 'sig:' || public.fs_uid()))$p$;
