@@ -9,7 +9,7 @@ import net.minecraft.util.Util;
 import java.util.function.Consumer;
 
 /**
- * Oyun içi ESC menüsüne Cubixora bölümü ekler: menünün içinde 2x2 kısayol ızgarası
+ * Oyun içi ESC menüsüne Cubixora bölümü ekler (sunucu kaynak paketi varken vanilla düğmeler olduğu gibi kalır, bölüm altlarına eklenir): menünün içinde 2x2 kısayol ızgarası
  * (Cubixora / Modlar / Gardrop / Mağaza) ve altında Performans Modu + Cubixora Ayarları + Yüklü Modlar.
  */
 public final class CxPause {
@@ -56,10 +56,40 @@ public final class CxPause {
         add.accept(new CxFlatButton(x + bw + 3, y, bw, bh, "Modlar", () -> mc.setScreen(new CxModsScreen(s))));
     }
 
+    /** Paketli sunucu + küçük ekran: vanilla düğmelerin altına iki satır (4'lü kısayol, ardından Performans / Ayarlar / Yüklü Modlar). */
+    private static void installCompact(Screen s, Consumer<ClickableWidget> add, MinecraftClient mc, int x, int y, int total, int bh, int gap) {
+        String[] names = { "Cubixora", "Modlar", "Gardrop", "Mağaza" };
+        Runnable[] acts = {
+            () -> mc.setScreen(new CxSettingsScreen(s)),
+            () -> mc.setScreen(new CxModsScreen(s)),
+            () -> mc.setScreen(new CxWardrobeScreen(s, false)),
+            () -> mc.setScreen(new CxWardrobeScreen(s, true))
+        };
+        int g = 4, w4 = (total - 3 * g) / 4;
+        for (int i = 0; i < 4; i++) {
+            CxFlatButton b = new CxFlatButton(x + i * (w4 + g), y, i == 3 ? total - 3 * (w4 + g) : w4, bh, names[i], acts[i]);
+            if (i == 0) b.accent = true;
+            add.accept(b);
+        }
+        int y2 = y + bh + gap, w3 = (total - 2 * g) / 3;
+        CxFlatButton perf = new CxFlatButton(x, y2, w3, bh, "", () -> {
+            if (CxPerf.on()) CxPerf.set(false);
+            else mc.setScreen(new CxConfirm(s, "Performans Modu",
+                "Bu ayar oyunun görsel kalitesini düşürür: grafikler hızlı moda geçer, bulut ve parçacıklar kısılır, gölgeler kapanır, menü efektleri sadeleşir ve FPS sınırı kaldırılır. Kapatınca eski ayarların geri gelir.",
+                "Onayla", "İptal", true, () -> CxPerf.set(true)));
+        });
+        perf.dynamic = () -> "Performans: " + (CxPerf.on() ? "AÇIK" : "KAPALI");
+        perf.accentWhen = CxPerf::on;
+        add.accept(perf);
+        add.accept(new CxFlatButton(x + w3 + g, y2, w3, bh, "Ayarlar", () -> mc.setScreen(new CxSettingsScreen(s))));
+        add.accept(new CxFlatButton(x + 2 * (w3 + g), y2, total - 2 * (w3 + g), bh, "Yüklü Modlar", () -> mc.setScreen(new CxFabricModsScreen(s))));
+    }
+
     public static void install(Screen s, Consumer<ClickableWidget> add) {
         if (!CxClient.enabled) return;
         MinecraftClient mc = MinecraftClient.getInstance();
-        if (serverPack(mc)) { installCorner(s, add, mc); return; }
+        // sunucu kaynak paketi (ItemsAdder vb.) varken vanilla düğmelere hiç dokunulmaz; Cubixora bölümü yalnız altlarına eklenir
+        boolean pack = serverPack(mc);
         int bottom = 0, top = Integer.MAX_VALUE, left = Integer.MAX_VALUE, right = 0;
         java.util.List<ClickableWidget> vanilla = new java.util.ArrayList<>();
         // yalnız gerçek düğmeler (başlık yazısı gibi ekran genişliğindeki parçalar sayılmaz)
@@ -72,14 +102,19 @@ public final class CxPause {
         int total = Math.max(204, right - left), gap = 4, bh = 20, x = left + (right - left) / 2 - total / 2;
         int need = 8 + 2 * bh + gap + 6 + 3 * bh + 2 * gap;             // ızgara + boşluk + üç seçenek
         int over = bottom + need - (s.height - 6);
-        if (over > 0) {                                                 // küçük ekranda vanilla düğmeleri yukarı al
+        boolean compact = false;
+        if (pack && over > 0) {                                         // paketli sunucu + küçük ekran: tek satır ızgara + tek satır seçenek
+            compact = true;
+            if (bottom + 8 + 2 * bh + gap > s.height - 4) { installCorner(s, add, mc); return; }   // o da sığmıyorsa köşe düğmeleri
+        }
+        if (over > 0 && !pack) {                                                 // küçük ekranda vanilla düğmeleri yukarı al
             int shift = Math.min(over, Math.max(0, top - 22));
             for (ClickableWidget w : vanilla) w.setY(w.getY() - shift);
             bottom -= shift;
         }
         // vanilla düğmeleri gizle, yerine aynı yerde Cubixora stilinde (küçük harf) kopyaları çiz
         boolean modSlot = false;
-        for (ClickableWidget w : vanilla) {
+        if (!pack) for (ClickableWidget w : vanilla) {
             if (isModMenu(w)) {
                 // Mod Menu'nun "Modlar" düğmesi: yerine Cubixora'nın kendi "Yüklü Modlar" ekranı (aynı yer, aynı boyut)
                 CxFlatButton c = new CxFlatButton(w.getX(), w.getY(), w.getWidth(), w.getHeight(), "Yüklü Modlar", () -> mc.setScreen(new CxFabricModsScreen(s)));
@@ -95,6 +130,7 @@ public final class CxPause {
             add.accept(c);
         }
         int y = bottom + 8, cg = 8, bw = (total - cg) / 2;
+        if (compact) { installCompact(s, add, mc, x, y, total, bh, gap); return; }
         String[] names = { "Cubixora", "Modlar", "Gardrop", "Mağaza" };
         Runnable[] acts = {
             () -> mc.setScreen(new CxSettingsScreen(s)),
