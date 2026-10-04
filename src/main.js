@@ -133,7 +133,7 @@ async function runPool(items, limit, worker) {
 const profileDir = (p) => path.join(MC_ROOT, 'profiles', p.id);
 const findProfile = (id) => config.profiles.find((p) => p.id === id);
 
-// ---------------------------------------------------------------- bulut (Firebase)
+// ---------------------------------------------------------------- bulut (Supabase)
 const cloud = require('./cloud')({
   DATA_DIR, UA, getConfig: () => config, saveConfig, protect, unprotect,
   log, send, profileDir, downloadFile
@@ -727,7 +727,7 @@ async function saveCosmetics(c) {
       // kurallar (eski yayın) bir eşyayı reddettiyse en azından skin gitsin, oyun içi görünüm bozulmasın
       if (/izni reddedildi|PERMISSION/i.test(e.message)) {
         try { await cloud.saveCosmetics(config.account.name, { ...(await cosmeticsForCloud(clean)), cape: '', wings: '', pet: false, capeTex: '', wingsTex: '' }); } catch {}
-        throw new Error('Seçimin bu bilgisayara kaydedildi ama diğer oyunculara gönderilemedi. Firebase kuralları güncel değil: firestore-kurallari.txt dosyasını Firebase > Firestore > Kurallar\'a yapıştırıp Yayınla.');
+        throw new Error('Seçimin bu bilgisayara kaydedildi ama diğer oyunculara gönderilemedi. Supabase kuralları güncel değil: supabase\\cubixora.sql dosyasını Supabase > SQL Editor\'de tekrar çalıştır.');
       }
       throw new Error('Kozmetikler bu bilgisayara kaydedildi ama buluta gönderilemedi: ' + e.message);
     }
@@ -1467,7 +1467,7 @@ else {
     if (!PREVIEW) setTimeout(() => discord.start(), 4000);
     fs.mkdirSync(MC_ROOT, { recursive: true });
     // bulut öncesi eski yerel/Google oturumu: sosyal özellikler çalışmaz, yeniden giriş istenir
-    if (config.account && cloud.enabled() && (config.account.type || 'microsoft') !== 'microsoft' && !config.account.cloud) {
+    if (config.account && cloud.enabled() && (config.account.type || 'microsoft') !== 'microsoft' && !(config.account.cloud && config.account.cloud.sb)) {
       log('[hesap] eski oturum bulundu, yeniden giriş gerekiyor'); config.account = null; saveConfig();
     }
     // eski sürümden kalan oturum: profilleri o hesaba bağla
@@ -1476,8 +1476,14 @@ else {
     createWindow();
     if (!PREVIEW) createTray();
     if (cloud.isCloudAccount()) win.webContents.once('did-finish-load', () => { startSocial(); setTimeout(() => cloud.pull(), 2500); });
+    // Güncellemeler Supabase (sürüm bilgisi) + GitHub Releases (paket) üzerinden: başlatıcının eski yöntemi devre dışı
+    if (global.__cubixora && cloud.sb()) {
+      const up = require('./updater')({ getManifest: () => cloud.sb().get('config/app', false), log });
+      Object.assign(global.__cubixora, { checkUpdate: up.checkUpdate, pendingBuild: up.pendingBuild, onUpdateReady: up.onUpdateReady });
+      setTimeout(() => global.__cubixora.checkUpdate().catch((e) => log(`[güncelleme] ${e.message}`)), PREVIEW ? 3000 : 15000);
+    }
     if (global.__cubixora) global.__cubixora.onUpdateReady((info) => send('app:update', info));
-    // Güncelleme: pencere açıkken 3 dk'da bir tek küçük belge sorgulanır (okuma kotası); yeni paket varsa hemen indirilir
+    // Güncelleme: pencere açıkken 3 dk'da bir tek küçük belge sorgulanır; yeni paket varsa hemen indirilir
     if (global.__cubixora && !PREVIEW) {
       let chk = false;
       setInterval(async () => {
@@ -1600,6 +1606,12 @@ handle('auth:reset', async (email) => {
   if (!EMAIL_RE.test(email)) throw new Error('Önce e-posta adresini yaz.');
   await cloud.resetPassword(email);
   return true;
+});
+handle('auth:resetConfirm', async (p) => {
+  if (!cloud.enabled()) throw new Error('Şifre sıfırlama sadece bulut hesaplarında çalışır.');
+  const email = String((p && p.email) || '').trim().toLowerCase();
+  if (!EMAIL_RE.test(email)) throw new Error('Önce e-posta adresini yaz.');
+  return cloud.resetConfirm({ email, code: p.code, password: p.password });
 });
 handle('cosmetics:assets', async () => cosmeticAssets());
 handle('cosmetics:get', async () => getCosmetics());
@@ -1919,5 +1931,5 @@ handle('admin:publishInfo', async () => {
   const c = config.adminPublish || {};
   return { dir: c.dir || path.join(d, 'src'), keyFile: c.keyFile || path.join(d, 'GIZLI-yayin-anahtari.key'),
     dirOk: fs.existsSync(path.join(c.dir || path.join(d, 'src'), 'main.js')), keyOk: fs.existsSync(c.keyFile || path.join(d, 'GIZLI-yayin-anahtari.key')),
-    build: global.__cubixora ? global.__cubixora.build : 0 };
+    build: global.__cubixora ? global.__cubixora.build : 0, ghSaved: !!c.gh, legacy: !!(cloud.cfg().firebaseLegacy && cloud.cfg().firebaseLegacy.apiKey) };
 });

@@ -5,9 +5,8 @@
 -- Dosya tekrar çalıştırılabilir (veri silinmez; tablolar "if not exists", fonksiyonlar "or replace").
 --
 -- Tasarım
---  * Giriş Firebase Authentication ile yapılmaya devam eder (Supabase > Authentication >
---    Third-party Auth > Firebase, proje kimliği: cubixora-launcher). Böylece oyuncuların
---    hesapları, şifreleri ve kimlikleri (uid) hiç değişmez.
+--  * Giriş Supabase Auth ile yapılır. Firebase'den taşınan hesaplar şifreleriyle birlikte gelir
+--    (supabase/kullanicilar.sql) ve eski kimlikleri app_metadata.fbuid'de durur; veriler bu kimlikle eşleşir.
 --  * Veriler tek bir "docs" tablosunda belge olarak tutulur (yol -> JSON). Launcher'daki
 --    kod Firestore'daki gibi çalışmaya devam eder.
 --  * İstemci tabloya DOĞRUDAN erişemez. Tüm okuma/yazma aşağıdaki fonksiyonlardan geçer ve
@@ -15,7 +14,7 @@
 --    (coin, mağaza, çekiliş hilesine karşı).
 --  * Anlık işler (çevrimiçi durumu, mesaj/arama sinyalleri, oyun içi emote/sprey) Supabase
 --    Realtime özel kanallarıyla yapılır: presence, sig:<uid>, fx.
---  * Güncelleme paketleri (config/app, bundle/*) Firebase'de kalır (EXE içindeki başlatıcı oradan okur).
+--  * Güncelleme paketleri GitHub Releases'tan iner; sürüm bilgisi config/app belgesindedir.
 -- =====================================================================================
 
 create table if not exists public.docs (
@@ -40,13 +39,12 @@ end $$;
 create or replace function public.fs_now() returns bigint
 language sql stable as $$ select (extract(epoch from now()) * 1000)::bigint $$;
 
--- Firebase oturumundaki kullanıcı kimliği (yalnızca bu Firebase projesinin imzaladığı oturumlar)
+-- oturumdaki oyuncunun kimliği. Firebase'den taşınan hesaplarda eski kimlik (app_metadata.fbuid; yalnız sunucu yazabilir),
+-- yeni hesaplarda Supabase kullanıcı kimliği. Böylece taşınan tüm veriler (profil, coin, arkadaşlık...) aynen çalışır.
 create or replace function public.fs_uid() returns text
 language sql stable as $$
-  select case
-    when coalesce(auth.jwt() ->> 'iss', '') = 'https://securetoken.google.com/cubixora-launcher'
-     and coalesce(auth.jwt() ->> 'aud', '') = 'cubixora-launcher'
-    then nullif(auth.jwt() ->> 'sub', '') end
+  select case when coalesce(auth.jwt() ->> 'role', '') = 'authenticated' and nullif(auth.jwt() ->> 'sub', '') is not null
+    then coalesce(nullif(auth.jwt() -> 'app_metadata' ->> 'fbuid', ''), auth.jwt() ->> 'sub') end
 $$;
 
 create or replace function public.fs_n(j jsonb) returns numeric
@@ -106,9 +104,10 @@ language sql volatile as $$ select coalesce(public.fs_before('profiles/' || u) -
 
 -- Admin: kurucu e-postası (doğrulanmış) ya da profilinde "founder" rütbesi olan herkes
 create or replace function public.fs_is_admin() returns boolean
-language sql volatile as $$
+language sql volatile security definer set search_path = public, pg_temp as $$
   select public.fs_uid() is not null and (
-    (lower(coalesce(auth.jwt() ->> 'email', '')) = 'cubixora@gmail.com' and coalesce((auth.jwt() ->> 'email_verified')::boolean, false))
+    exists (select 1 from auth.users u where u.id::text = auth.jwt() ->> 'sub'
+            and lower(u.email) = 'cubixora@gmail.com' and u.email_confirmed_at is not null)
     or public.fs_has(public.fs_roles(public.fs_uid()), 'founder'))
 $$;
 

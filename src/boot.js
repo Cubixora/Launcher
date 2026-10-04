@@ -1,8 +1,8 @@
 // Cubixora Launcher - başlatıcı (EXE'nin içindeki sabit kısım)
 //
 // Launcher'ın asıl kodu (arayüz, özellikler, oyun içi mod dosyaları) bir "paket" olarak gelir.
-// Admin yeni bir paket yayınladığında (Admin paneli > Güncelleme yayınla) bu dosya onu
-// Firestore'dan indirir, imzasını doğrular ve bir sonraki açılışta onu çalıştırır.
+// Admin yeni bir paket yayınladığında (Admin paneli > Güncelleme yayınla) bu dosya sürüm bilgisini Supabase'den
+// (config/app) okur, paketi GitHub Releases'tan indirir, imzasını doğrular ve bir sonraki açılışta onu çalıştırır.
 // Böylece yeni EXE dağıtmadan her şey güncellenebilir.
 //
 // Güvenlik: paketler admin'in bilgisayarındaki gizli anahtarla imzalanır (ed25519). İmzası
@@ -70,34 +70,42 @@ let chosen = choose();
 let readyListeners = [];
 let pendingBuild = null;
 
-const projectId = () => { try { return JSON.parse(fs.readFileSync(path.join(chosen.dir, 'cloud.json'), 'utf8')).projectId; } catch { return null; } };
-const apiKey = () => { try { return JSON.parse(fs.readFileSync(path.join(chosen.dir, 'cloud.json'), 'utf8')).apiKey; } catch { return null; } };
-const field = (f) => (f ? (f.integerValue !== undefined ? Number(f.integerValue) : f.stringValue !== undefined ? f.stringValue : f.booleanValue) : undefined);
+const cloudCfg = () => { try { return JSON.parse(fs.readFileSync(path.join(chosen.dir, 'cloud.json'), 'utf8')); } catch { return {}; } };
+const cloudOn = () => !!(cloudCfg().supabaseUrl && cloudCfg().supabaseKey);
 
-async function getDocFields(p) {
-  const url = `https://firestore.googleapis.com/v1/projects/${projectId()}/databases/(default)/documents/${p}?key=${encodeURIComponent(apiKey() || '')}`;
-  const r = await fetch(url);
-  if (r.status === 404) return null;
+// sürüm bilgisi: Supabase config/app (herkese açık okuma) -> { build, sha256, sig, url, notes }
+async function getManifest() {
+  const c = cloudCfg();
+  const r = await fetch(`${String(c.supabaseUrl).replace(/\/+$/, '')}/rest/v1/rpc/fs_get`, {
+    method: 'POST', headers: { apikey: c.supabaseKey, Authorization: `Bearer ${c.supabaseKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ paths: ['config/app'], omit: [] })
+  });
   if (!r.ok) throw new Error(`güncelleme sunucusu ${r.status}`);
-  return (await r.json()).fields || {};
+  const rows = await r.json();
+  return (rows && rows[0] && rows[0].data) || null;
 }
 
 // Yeni paket var mı? Varsa indirir, doğrular ve kurar (bir sonraki açılışta çalışır).
 let onProgress = null;   // ilk açılış penceresi için (indirilen parça / toplam)
 async function checkUpdate() {
-  if (DEV_LOCAL || !projectId()) return null;
-  const f = await getDocFields('config/app');
-  if (!f) return null;
-  const build = field(f.build), chunks = field(f.chunks), sha = field(f.sha256), sig = field(f.sig);
+  if (DEV_LOCAL || !cloudOn()) return null;
+  const f = await getManifest();
+  if (!f || !f.url) return null;
+  const build = Number(f.build) || 0, sha = f.sha256, sig = f.sig;
   const s = readState();
   if (!build || build <= Math.max(chosen.build, s.build || 0, pendingBuild || 0) || (s.bad || []).includes(build)) return null;
   if (!verify(build, sha, sig)) throw new Error('paket imzası geçersiz, yüklenmedi');
-  const parts = [];
-  for (let i = 0; i < chunks; i++) {
-    const c = await getDocFields(`bundle/b${build}-${i}`);
-    if (!c) throw new Error(`paket parçası eksik (${i})`);
-    parts.push(Buffer.from(field(c.data), 'base64'));
-    if (onProgress) { try { onProgress(i + 1, chunks); } catch {} }
+  if (!/^https:\/\/(github\.com|objects\.githubusercontent\.com|[a-z0-9-]+\.supabase\.co)\//.test(f.url)) throw new Error('paket adresi tanınmıyor');
+  const r = await fetch(f.url, { redirect: 'follow', headers: { 'User-Agent': 'Cubixora-Launcher' } });
+  if (!r.ok || !r.body) throw new Error(`paket indirilemedi (${r.status})`);
+  const total = Number(r.headers.get('content-length')) || f.size || 0;
+  const parts = []; let got = 0;
+  const reader = r.body.getReader();
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    parts.push(Buffer.from(value)); got += value.length;
+    if (onProgress && total) { try { onProgress(Math.min(got, total), total); } catch {} }
   }
   const zip = Buffer.concat(parts);
   if (crypto.createHash('sha256').update(zip).digest('hex') !== sha) throw new Error('paket bozuk indi');
@@ -116,7 +124,7 @@ async function checkUpdate() {
     if (/^b\d+$/.test(d) && d !== `b${build}` && d !== path.basename(chosen.dir)) fs.rmSync(path.join(APP_DIR, d), { recursive: true, force: true });
   }
   pendingBuild = build;
-  const info = { build, notes: field(f.notes) || '' };
+  const info = { build, notes: f.notes || '' };
   readyListeners.forEach((fn) => { try { fn(info); } catch {} });
   return info;
 }
@@ -168,15 +176,15 @@ function firstRunWindow() {
 }
 
 async function start() {
-  if (DEV_LOCAL || !projectId()) return loadMain();
+  if (DEV_LOCAL || !cloudOn()) return loadMain();
   if (!app.requestSingleInstanceLock()) { app.quit(); return; }   // güncelleme beklenirken ikinci tıklama ikinci launcher açmasın
   let win = null, done = false;
   const LIMIT = 25000;                     // indirme sürüyorsa en fazla bu kadar beklenir
   const timer = setTimeout(() => { done = true; }, LIMIT);
   try {
     // önce hızlı bakış: yeni sürüm yoksa pencere hiç açılmaz, gecikme ~0
-    const f = await Promise.race([getDocFields('config/app'), new Promise((r) => setTimeout(() => r(null), 3500))]);
-    const cloudBuild = f ? field(f.build) : 0, s = readState();
+    const f = await Promise.race([getManifest(), new Promise((r) => setTimeout(() => r(null), 3500))]);
+    const cloudBuild = f && f.url ? Number(f.build) || 0 : 0, s = readState();
     if (cloudBuild && cloudBuild > Math.max(chosen.build, s.build || 0) && !(s.bad || []).includes(cloudBuild)) {
       await app.whenReady();
       win = firstRunWindow();

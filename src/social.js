@@ -1,10 +1,9 @@
 // Cubixora sosyal + ekonomi + admin (ana süreç).
-// Kalıcı veriler Supabase'de (ya da eski kurulumda Firestore'da), anlık sinyaller Supabase Realtime'da (eskisinde Realtime Database).
+// Kalıcı veriler Supabase veritabanında, anlık sinyaller (mesaj geldi, arama, istek, durum) Supabase Realtime'da.
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
 const crypto = require('crypto');
-const createDb = require('./fsdb');
 
 const ADMIN_EMAIL = 'cubixora@gmail.com';
 const HANDLE_RE = /^[a-z0-9_.]{3,20}$/;
@@ -50,13 +49,10 @@ const lpFor = (n) => 50 * n * (n - 1);
 
 module.exports = function createSocial(ctx) {
   const { cloud, getConfig, saveConfig, send, log, protect, unprotect, DATA_DIR, app } = ctx;
-  const projectId = () => (cloud.cfg().projectId || '');
-  const rtdbUrl = () => cloud.cfg().rtdbUrl || `https://${projectId()}-default-rtdb.europe-west1.firebasedatabase.app`;
-  // fdb: Firebase Firestore (güncelleme paketleri her zaman burada; EXE'deki başlatıcı oradan okur)
-  // db : asıl veritabanı. cloud.json'da Supabase ayarı varsa Supabase, yoksa Firestore.
-  const fdb = createDb({ projectId, apiKey: () => cloud.cfg().apiKey || '', token: () => cloud.token(), rtdbUrl });
-  const db = (cloud.sb && cloud.sb()) || fdb;
-  if (db !== fdb) log('[sosyal] veritabanı: Supabase');
+  // veritabanı: Supabase (bulut kapalıysa bağlanmayan boş bir istemci; sosyal özellikler zaten giriş ister)
+  const db = cloud.sb() || require('./sbdb')({ url: 'https://bulut-kapali.invalid', key: '', token: async () => null });
+  // GEÇİCİ: Firebase'den taşıma ve eski sürümlere son gönderim için (admin). Bkz. legacy-firebase.js
+  const legacy = () => require('./legacy-firebase')(cloud.cfg().firebaseLegacy);
 
   const me = () => cloud.uid();
   const acct = () => getConfig().account;
@@ -356,7 +352,7 @@ module.exports = function createSocial(ctx) {
   // ------------------------------------------------------------ anlık durum (presence)
   let myStatus = 'online', heart = null, gameText = '';
   const BEAT_MS = 30 * 1000, STALE_MS = 80 * 1000; // 30 sn'de bir "buradayım", 80 sn ses yoksa çevrimdışı
-  // arkadaşların durumu anlık akıştan gelir (RTDB); değişenler toplu olarak arayüze gönderilir
+  // arkadaşların durumu anlık akıştan gelir (Realtime Presence); değişenler toplu olarak arayüze gönderilir
   let stopPresence = null, presTimer = null, presDirty = new Set(), lastShown = {};
   const shownStatus = (uid) => { const p = publicProfile({ id: uid }); return p ? `${p.status}|${p.game}` : ''; };
   function flushPresence() {
@@ -1060,10 +1056,14 @@ module.exports = function createSocial(ctx) {
   }
   async function adminDeleteReport(id) { needAdmin(); await db.del(`reports/${String(id).replace(/[^a-z0-9]/gi, '')}`); return true; }
   // ------------------------------------------------------------ Firebase -> Supabase taşıma (bir kez, admin)
-  // Hesaplar Firebase'de kaldığı için kimlikler (uid) aynıdır; tüm belgeler olduğu gibi kopyalanır.
-  async function adminMigrate() {
+  // Hesaplar eski kimlikleriyle taşındığı için (app_metadata.fbuid) tüm belgeler olduğu gibi kopyalanır.
+  async function adminMigrate({ password } = {}) {
     needAdmin();
-    if (db === fdb) throw new Error("Supabase ayarları yok: src\\cloud.json dosyasına supabaseUrl ve supabaseKey ekle.");
+    const lf = legacy();
+    if (!lf) throw new Error('cloud.json içinde firebaseLegacy ayarı yok.');
+    if (!password) throw new Error('Firebase admin şifreni yaz (eski hesabının şifresi).');
+    await lf.signIn(ADMIN_EMAIL, password);
+    const fdb = lf.db;
     const TOP = ['config', 'news', 'notifications', 'giftCodes', 'betaKeys', 'users', 'emails', 'bannedEmails', 'usernames', 'handles', 'cosmetics',
       'profiles', 'giveaways', 'privates', 'wallets', 'inventory', 'friendRequests', 'friendships', 'chats', 'groups', 'reports'];
     const GROUPS = ['items', 'messages', 'entries'];
@@ -1072,7 +1072,8 @@ module.exports = function createSocial(ctx) {
     const flush = async () => { if (!buf.length) return; await db.rpc('fs_import', { docs: buf }); buf = []; bytes = 0; prog('Yazılıyor'); };
     const push = async (d) => {
       const { id, path: p, _updated, ...data } = d; void id;
-      if (!p || p === 'config/app' || p.startsWith('bundle/')) return;
+      if (!p || p.startsWith('bundle/')) return;
+      if (p === 'config/app') { data.legacy = true; delete data.chunks; }   // sadece sürüm numarası taşınır (paket indirme adresi yok)
       const item = { path: p, data, updated: _updated || 0 };
       const sz = JSON.stringify(item).length;
       if (bytes && bytes + sz > 600000) await flush();
@@ -1102,7 +1103,7 @@ module.exports = function createSocial(ctx) {
     log(`[taşıma] ${total} belge Supabase'e kopyalandı`);
     return { total };
   }
-  async function adminDbStats() { needAdmin(); if (db === fdb) return { kind: 'firestore' }; return { kind: 'supabase', ...(await db.rpc('fs_stats')) }; }
+  async function adminDbStats() { needAdmin(); return { kind: 'supabase', legacy: !!legacy(), ...(await db.rpc('fs_stats')) }; }
 
   async function adminDeleteNotification(id) { needAdmin(); await db.del(`notifications/${id}`); notifGlobal.at = 0; return true; }
   async function adminUser(q) {
@@ -1234,14 +1235,32 @@ module.exports = function createSocial(ctx) {
   }
   async function adminDeleteBetaKey(key) { needAdmin(); await db.del(`betaKeys/${key}`); return true; }
 
-  // güncelleme yayınla: klasördeki launcher kodunu paketler, gizli anahtarla imzalar, Firestore'a yükler
-  async function adminPublish({ dir, keyFile, notes }) {
+  // güncelleme yayınla: klasördeki launcher kodunu paketler, gizli anahtarla imzalar
+  // Güncelleme yayınla: paket imzalanır, GitHub Releases'a ("app-bundle" sürümü) yüklenir, sürüm bilgisi Supabase config/app'e yazılır.
+  // legacyPassword verilirse paket ayrıca eski (Firebase'li) launcher'lara da gönderilir (geçiş için, bir kez).
+  const GH_REPO = 'Cubixora/Launcher', GH_TAG = 'app-bundle';
+  async function ghCall(token, method, url, body, headers = {}) {
+    const r = await fetch(url.startsWith('http') ? url : `https://api.github.com${url}`, {
+      method, body, headers: { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'Cubixora-Launcher', ...headers }
+    });
+    if (r.status === 404 && method === 'GET') return null;
+    const j = r.status === 204 ? {} : await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(r.status === 401 ? 'GitHub anahtarı geçersiz ya da süresi dolmuş.' : r.status === 403 ? 'GitHub anahtarının bu depoya yazma izni yok (Contents: Read and write).' : `GitHub hatası: ${j.message || r.status}`);
+    return j;
+  }
+  async function adminPublish({ dir, keyFile, notes, ghToken, legacyPassword }) {
     needAdmin();
     const { createZip, collect } = require('./ziputil');
     if (!fs.existsSync(path.join(dir, 'main.js')) || !fs.existsSync(path.join(dir, 'renderer'))) throw new Error('Seçilen klasör launcher\'ın "src" klasörü değil.');
     const keyPem = fs.readFileSync(keyFile, 'utf8');
-    const cur = await fdb.get('config/app', false);
-    const build = Math.max((cur && cur.build) || 0, (global.__cubixora && global.__cubixora.build) || 0) + 1;
+    const c = getConfig();
+    const token = String(ghToken || '').trim() || (c.adminPublish && c.adminPublish.gh ? unprotect(c.adminPublish.gh) : '');
+    if (!token) throw new Error('GitHub anahtarını yaz (bir kez yazman yeterli, sonra hatırlanır).');
+    let lf = null;
+    if (legacyPassword) { lf = legacy(); if (!lf) throw new Error('cloud.json içinde firebaseLegacy ayarı yok.'); await lf.signIn(ADMIN_EMAIL, legacyPassword); }
+    const cur = await db.get('config/app', false);
+    const old = lf ? await lf.db.get('config/app', false).catch(() => null) : null;
+    const build = Math.max((cur && cur.build) || 0, (old && old.build) || 0, (global.__cubixora && global.__cubixora.build) || 0) + 1;
     const files = collect(dir, dir, (rel) => /(^|\/)(node_modules|\.git)(\/|$)/.test(rel) || /\.key$/i.test(rel));
     const bj = files.find((f) => f.name === 'build.json');
     const bjData = Buffer.from(JSON.stringify({ build }, null, 2));
@@ -1250,19 +1269,35 @@ module.exports = function createSocial(ctx) {
     const sha = crypto.createHash('sha256').update(zip).digest('hex');
     const sig = crypto.sign(null, Buffer.from(`cubixora:${build}:${sha}`), keyPem).toString('base64');
     if (global.__cubixora && !global.__cubixora.verify(build, sha, sig)) throw new Error('Bu anahtar, launcher\'daki kilitle eşleşmiyor (yanlış anahtar dosyası).');
-    const b64 = zip.toString('base64');
-    const CH = 900000;
-    const chunks = Math.ceil(b64.length / CH);
-    send('admin:publish', { stage: 'Yükleniyor', current: 0, total: chunks });
-    for (let i = 0; i < chunks; i++) {
-      await fdb.set(`bundle/b${build}-${i}`, { data: b64.slice(i * CH, (i + 1) * CH) });
-      send('admin:publish', { stage: 'Yükleniyor', current: i + 1, total: chunks });
+    // 1) GitHub: paket dosyası
+    send('admin:publish', { stage: 'GitHub\'a yükleniyor', current: 0, total: 1 });
+    let rel = await ghCall(token, 'GET', `/repos/${GH_REPO}/releases/tags/${GH_TAG}`);
+    if (!rel) rel = await ghCall(token, 'POST', `/repos/${GH_REPO}/releases`, JSON.stringify({ tag_name: GH_TAG, target_commitish: 'main', name: 'Launcher güncelleme paketleri',
+      body: 'Launcher\'ın otomatik güncelleme paketleri (launcher kendisi indirir). Kurulum için en son sürümdeki Cubixora-Launcher.exe dosyasını indirin.', prerelease: true }), { 'Content-Type': 'application/json' });
+    const name = `cubixora-b${build}.zip`;
+    for (const a of rel.assets || []) if (a.name === name) await ghCall(token, 'DELETE', `/repos/${GH_REPO}/releases/assets/${a.id}`);
+    const up = await ghCall(token, 'POST', `https://uploads.github.com/repos/${GH_REPO}/releases/${rel.id}/assets?name=${encodeURIComponent(name)}`, zip, { 'Content-Type': 'application/zip' });
+    const url = up.browser_download_url || `https://github.com/${GH_REPO}/releases/download/${GH_TAG}/${name}`;
+    send('admin:publish', { stage: 'GitHub\'a yüklendi', current: 1, total: 1 });
+    // 2) Supabase: sürüm bilgisi (launcher'lar bunu görüp paketi indirir)
+    await db.set('config/app', { build, sha256: sha, sig, size: zip.length, url, notes: String(notes || '').slice(0, 500), at: db.ts(now()) });
+    // eski paketleri temizle (son 2 kalır)
+    for (const a of rel.assets || []) {
+      const b = Number((/^cubixora-b(\d+)\.zip$/.exec(a.name) || [])[1] || 0);
+      if (b && b < build - 1) await ghCall(token, 'DELETE', `/repos/${GH_REPO}/releases/assets/${a.id}`).catch(() => {});
     }
-    await fdb.set('config/app', { build, chunks, sha256: sha, sig, size: zip.length, notes: String(notes || '').slice(0, 500), at: fdb.ts(now()) });
-    // eski paket parçalarını temizle
-    if (cur && cur.build && cur.chunks) for (let i = 0; i < cur.chunks + 2; i++) fdb.del(`bundle/b${cur.build - 1}-${i}`).catch(() => {});
-    const c = getConfig(); c.adminPublish = { dir, keyFile }; saveConfig();
-    return { build, size: zip.length, files: files.length };
+    // 3) GEÇİCİ: eski (Firebase'li) launcher'lara da gönder
+    if (lf) {
+      const b64 = zip.toString('base64'), CH = 900000, chunks = Math.ceil(b64.length / CH);
+      for (let i = 0; i < chunks; i++) {
+        await lf.db.set(`bundle/b${build}-${i}`, { data: b64.slice(i * CH, (i + 1) * CH) });
+        send('admin:publish', { stage: 'Eski sürümlere gönderiliyor', current: i + 1, total: chunks });
+      }
+      await lf.db.set('config/app', { build, chunks, sha256: sha, sig, size: zip.length, notes: String(notes || '').slice(0, 500), at: lf.db.ts(now()) });
+      if (old && old.build && old.chunks) for (let i = 0; i < old.chunks + 2; i++) lf.db.del(`bundle/b${old.build}-${i}`).catch(() => {});
+    }
+    c.adminPublish = { ...(c.adminPublish || {}), dir, keyFile, gh: protect(token) }; saveConfig();
+    return { build, size: zip.length, files: files.length, legacy: !!lf };
   }
 
   // ------------------------------------------------------------ yaşam döngüsü

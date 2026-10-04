@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('cx', {
   loginSocial: (provider) => invoke('auth:social', provider),
   rename: (name) => invoke('auth:rename', name),
   resetPassword: (email) => invoke('auth:reset', email),
+  resetConfirm: (p) => invoke('auth:resetConfirm', p),
   syncNow: () => invoke('sync:now'),
   cosmeticAssets: () => invoke('cosmetics:assets'),
   getCosmetics: () => invoke('cosmetics:get'),

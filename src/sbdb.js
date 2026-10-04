@@ -1,5 +1,5 @@
 // Supabase istemcisi: fsdb.js ile birebir aynı arayüz (Firestore benzeri belgeler + anlık kanallar).
-// Giriş Firebase ile yapılır; Firebase oturum anahtarı Supabase'e gönderilir (Third-party Auth).
+// Giriş Supabase Auth ile yapılır; oturum anahtarı her istekte gönderilir.
 // Tüm okuma/yazmalar sunucudaki fs_* fonksiyonlarından geçer ve orada kurallarla denetlenir (supabase/cubixora.sql).
 const tls = require('tls');
 const crypto = require('crypto');
@@ -221,7 +221,7 @@ module.exports = function createSbDb({ url, key, token, log = () => {} }) {
       hb = setInterval(() => sendRaw('phoenix', 'heartbeat', {}), 25000);
       for (const c of chans.values()) if (c.want) join(c);
       clearInterval(tokenTimer);
-      // Firebase oturum anahtarı saatte bir yenilenir: açık kanallara yenisi bildirilir
+      // oturum anahtarı saatte bir yenilenir: açık kanallara yenisi bildirilir
       tokenTimer = setInterval(async () => {
         const t = await bearer(true).catch(() => null);
         if (!t || t === lastToken) return;

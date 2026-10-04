@@ -802,8 +802,35 @@ function bind() {
   $('#forgotBtn').onclick = async () => {
     const email = $('#liLogin').value.trim();
     if (!MAIL_RE.test(email)) { fail($('#liLogin'), 'Şifre sıfırlama bağlantısı için önce e-posta adresini yaz.'); return; }
-    try { await cx.resetPassword(email); toast('Şifre sıfırlama bağlantısı e-postana gönderildi. Gelen kutunu (ve spam klasörünü) kontrol et.', 'success'); }
+    try { await cx.resetPassword(email); toast('Şifre sıfırlama kodu e-postana gönderildi. Gelen kutunu (ve spam klasörünü) kontrol et.', 'success'); openResetCode(email); }
     catch (e) { toast(e.message, 'error'); }
+  };
+}
+// e-postadaki kodla yeni şifre belirleme penceresi
+function openResetCode(email) {
+  let w = $('#resetWin');
+  if (!w) {
+    w = document.createElement('div');
+    w.id = 'resetWin'; w.className = 'modal hidden';
+    w.innerHTML = `<div class="confirm"><b>Yeni şifre belirle</b><p id="rsText"></p>
+      <input class="input" id="rsCode" inputmode="numeric" maxlength="8" placeholder="E-postadaki kod" autocomplete="one-time-code" />
+      <input class="input" id="rsPass" type="password" placeholder="Yeni şifre (en az 6 karakter)" autocomplete="new-password" style="margin-top:8px" />
+      <div class="nick-actions"><button class="btn btn-ghost" id="rsNo">Vazgeç</button><button class="btn btn-primary" id="rsYes">Şifreyi değiştir</button></div></div>`;
+    document.body.appendChild(w);
+  }
+  $('#rsText').textContent = `${email} adresine gelen kodu ve yeni şifreni yaz.`;
+  $('#rsCode').value = ''; $('#rsPass').value = '';
+  w.classList.remove('hidden');
+  setTimeout(() => $('#rsCode').focus(), 50);
+  $('#rsNo').onclick = () => w.classList.add('hidden');
+  $('#rsYes').onclick = async () => {
+    const b = $('#rsYes'); b.classList.add('loading');
+    try {
+      await cx.resetConfirm({ email, code: $('#rsCode').value, password: $('#rsPass').value });
+      w.classList.add('hidden');
+      $('#liLogin').value = email;
+      toast('Şifren değiştirildi. Yeni şifrenle giriş yapabilirsin.', 'success');
+    } catch (e) { toast(e.message, 'error'); } finally { b.classList.remove('loading'); }
   };
 }
 

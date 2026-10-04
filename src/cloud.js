@@ -1,6 +1,6 @@
-// Cubixora bulut: Firebase (Authentication + Firestore) üzerinden hesaplar ve
+// Cubixora bulut: Supabase (Auth + veritabanı) üzerinden hesaplar ve
 // profil/mod eşitleme. Ayarlar src/cloud.json dosyasından okunur:
-//   { "apiKey": "...", "projectId": "..." }
+//   { "supabaseUrl": "https://xxxx.supabase.co", "supabaseKey": "anon/publishable anahtar" }
 // Dosya boşsa bulut kapalıdır; launcher yerel hesaplarla çalışmaya devam eder.
 //
 // Buluta kaydedilenler: kullanıcı adı, oyun içi UUID, profiller ve her profilin mod listesi.
@@ -24,107 +24,87 @@ module.exports = function createCloud(ctx) {
     try { settings = JSON.parse(fs.readFileSync(path.join(__dirname, 'cloud.json'), 'utf8')); } catch { settings = {}; }
     return settings;
   }
-  const enabled = () => !!(cfg().apiKey && cfg().projectId);
-  const FS_BASE = () => `https://firestore.googleapis.com/v1/projects/${cfg().projectId}/databases/(default)/documents`;
+  const enabled = () => !!(cfg().supabaseUrl && cfg().supabaseKey);
+  const SB = () => String(cfg().supabaseUrl || '').replace(/\/+$/, '');
 
   // ------------------------------------------------------------ hata metinleri
   const AUTH_ERRORS = {
-    EMAIL_EXISTS: 'Bu e-posta ile zaten bir hesap var. Giriş yapmayı dene.',
-    EMAIL_NOT_FOUND: 'E-posta veya şifre hatalı.',
-    INVALID_PASSWORD: 'E-posta veya şifre hatalı.',
-    INVALID_LOGIN_CREDENTIALS: 'E-posta veya şifre hatalı.',
-    INVALID_EMAIL: 'Geçerli bir e-posta adresi yaz.',
-    WEAK_PASSWORD: 'Şifre en az 6 karakter olmalı.',
-    USER_DISABLED: 'Bu hesap devre dışı bırakılmış.',
-    TOO_MANY_ATTEMPTS_TRY_LATER: 'Çok fazla deneme yapıldı. Biraz bekleyip tekrar dene.',
-    OPERATION_NOT_ALLOWED: 'Bu giriş yöntemi Firebase\'de açılmamış (BENİ OKU > Bulut kurulumu).',
-    TOKEN_EXPIRED: 'Oturumun süresi doldu, tekrar giriş yap.',
-    INVALID_REFRESH_TOKEN: 'Oturumun süresi doldu, tekrar giriş yap.',
-    INVALID_IDP_RESPONSE: 'Google girişi Firebase tarafından kabul edilmedi (BENİ OKU > Bulut kurulumu, 3. adım).'
+    user_already_exists: 'Bu e-posta ile zaten bir hesap var. Giriş yapmayı dene.',
+    email_exists: 'Bu e-posta ile zaten bir hesap var. Giriş yapmayı dene.',
+    invalid_credentials: 'E-posta veya şifre hatalı.',
+    email_address_invalid: 'Geçerli bir e-posta adresi yaz.',
+    validation_failed: 'Geçerli bir e-posta adresi ve en az 6 karakterli şifre yaz.',
+    weak_password: 'Şifre en az 6 karakter olmalı.',
+    user_banned: 'Bu hesap devre dışı bırakılmış.',
+    over_request_rate_limit: 'Çok fazla deneme yapıldı. Biraz bekleyip tekrar dene.',
+    over_email_send_rate_limit: 'Çok fazla e-posta istendi. Biraz bekleyip tekrar dene.',
+    email_not_confirmed: 'E-posta adresin henüz doğrulanmamış. Gelen kutundaki bağlantıya tıkla.',
+    signup_disabled: 'Şu an yeni hesap açılamıyor.',
+    refresh_token_not_found: 'Oturumun süresi doldu, tekrar giriş yap.',
+    refresh_token_already_used: 'Oturumun süresi doldu, tekrar giriş yap.',
+    session_not_found: 'Oturumun süresi doldu, tekrar giriş yap.',
+    provider_disabled: 'Google girişi Supabase\'de açılmamış (Authentication > Providers > Google).',
+    bad_oauth_callback: 'Google girişi kabul edilmedi.',
+    bad_jwt: 'Oturumun süresi doldu, tekrar giriş yap.'
   };
   function authError(body, status) {
-    const raw = (body && body.error && body.error.message) || String(status);
-    const code = raw.split(/[ :]/)[0];
+    const code = (body && (body.error_code || body.code)) || '';
     if (AUTH_ERRORS[code]) return new Error(AUTH_ERRORS[code]);
-    if (/API key not valid/i.test(raw)) return new Error('Bulut anahtarı (apiKey) geçersiz. src\\cloud.json dosyasını kontrol et.');
+    const raw = (body && (body.msg || body.message || body.error_description || body.error)) || String(status);
+    if (/invalid login credentials/i.test(raw)) return new Error(AUTH_ERRORS.invalid_credentials);
+    if (/already registered/i.test(raw)) return new Error(AUTH_ERRORS.user_already_exists);
+    if (/invalid api key|no api key/i.test(raw)) return new Error('Bulut anahtarı (supabaseKey) geçersiz. src\\cloud.json dosyasını kontrol et.');
     return new Error(`Bulut hatası: ${raw}`);
   }
 
-  // ------------------------------------------------------------ Firebase Auth (REST)
-  async function authCall(method, body) {
-    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:${method}?key=${encodeURIComponent(cfg().apiKey)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
-    });
+  // ------------------------------------------------------------ Supabase Auth (REST)
+  async function authCall(pathQ, body, bearer, method = 'POST') {
+    let r;
+    try {
+      r = await fetch(`${SB()}/auth/v1/${pathQ}`, {
+        method, headers: { apikey: cfg().supabaseKey, Authorization: `Bearer ${bearer || cfg().supabaseKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body || {})
+      });
+    } catch { throw new Error('Bulut sunucusuna ulaşılamadı. İnternet bağlantını kontrol et.'); }
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw authError(j, r.status);
     return j;
   }
 
-  let idToken = null, idTokenExp = 0;
+  // oyuncu kimliği: Firebase'den taşınan hesaplarda eski kimlik (app_metadata.fbuid, sadece sunucu yazabilir), yenilerde Supabase kimliği
+  const uidOf = (user) => String((user && user.app_metadata && user.app_metadata.fbuid) || (user && user.id) || '');
+  let idToken = null, idTokenExp = 0, refreshing = null;
   function remember(res) {
-    idToken = res.idToken || res.id_token;
-    idTokenExp = Date.now() + (Number(res.expiresIn || res.expires_in || 3600) - 120) * 1000;
-    const refresh = res.refreshToken || res.refresh_token;
-    return { uid: res.localId || res.user_id, refresh: protect(refresh) };
+    idToken = res.access_token;
+    idTokenExp = Date.now() + (Number(res.expires_in || 3600) - 120) * 1000;
+    return { uid: uidOf(res.user), refresh: protect(res.refresh_token), sb: 1 };
   }
 
   async function token() {
     if (idToken && Date.now() < idTokenExp) return idToken;
-    const a = getConfig().account;
-    if (!a || !a.cloud) throw new Error('Bulut oturumu yok.');
-    const r = await fetch(`https://securetoken.googleapis.com/v1/token?key=${encodeURIComponent(cfg().apiKey)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: unprotect(a.cloud.refresh) })
-    });
-    const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw authError(j, r.status);
-    a.cloud = { ...a.cloud, ...remember(j) };
-    saveConfig();
-    return idToken;
+    if (refreshing) return refreshing;
+    refreshing = (async () => {
+      const a = getConfig().account;
+      if (!a || !a.cloud || !a.cloud.sb) throw new Error('Bulut oturumu yok.');
+      const j = await authCall('token?grant_type=refresh_token', { refresh_token: unprotect(a.cloud.refresh) });
+      a.cloud = { ...a.cloud, ...remember(j) };   // Supabase yenileme anahtarı her seferinde değişir: hemen kaydedilir
+      saveConfig();
+      return idToken;
+    })().finally(() => { refreshing = null; });
+    return refreshing;
   }
 
-  // ------------------------------------------------------------ Firestore (REST)
-  const toFields = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) =>
-    [k, typeof v === 'number' ? { integerValue: String(Math.round(v)) } : typeof v === 'boolean' ? { booleanValue: v } : { stringValue: String(v) }]));
-  const fromFields = (f = {}) => Object.fromEntries(Object.entries(f).map(([k, v]) =>
-    [k, v.integerValue !== undefined ? Number(v.integerValue) : v.booleanValue !== undefined ? v.booleanValue : v.stringValue]));
-
-  async function fsCall(method, url, body, auth = true) {
-    const headers = { 'Content-Type': 'application/json' };
-    if (auth) headers.Authorization = `Bearer ${await token()}`;
-    const r = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    if (r.status === 404) return { notFound: true };
-    const j = await r.json().catch(() => ({}));
-    if (r.status === 409) return { exists: true };
-    if (!r.ok) {
-      const msg = (j.error && (j.error.status || j.error.message)) || r.status;
-      if (msg === 'PERMISSION_DENIED') throw new Error('Bulut izni reddedildi. Firestore kurallarını kontrol et (BENİ OKU > Bulut kurulumu).');
-      throw new Error(`Bulut hatası: ${msg}`);
-    }
-    return j;
-  }
-  // ------------------------------------------------------------ Supabase (cloud.json'da supabaseUrl + supabaseKey varsa)
-  // Giriş yine Firebase ile; veriler ve anlık kanallar Supabase'de. Tek bağlantı launcher'ın her yerinde paylaşılır.
+  // ------------------------------------------------------------ belgeler (Supabase; tek bağlantı launcher'ın her yerinde paylaşılır)
   let sbInst = null;
   const sb = () => {
-    const c = cfg();
-    if (!c.supabaseUrl || !c.supabaseKey) return null;
-    if (!sbInst) sbInst = require('./sbdb')({ url: c.supabaseUrl, key: c.supabaseKey, token: () => token(), log });
+    if (!enabled()) return null;
+    if (!sbInst) sbInst = require('./sbdb')({ url: SB(), key: cfg().supabaseKey, token: () => token(), log });
     return sbInst;
   };
   const plain = (d) => { if (!d) return null; const { id, path: _p, _updated, ...rest } = d; void id; void _p; void _updated; return rest; };
-
-  const getDoc = async (p, auth = true) => {
-    if (sb()) return plain(await sb().get(p, auth));
-    const j = await fsCall('GET', `${FS_BASE()}/${p}`, null, auth); return j.notFound ? null : fromFields(j.fields);
-  };
-  const setDoc = (p, obj) => (sb() ? sb().set(p, obj) : fsCall('PATCH', `${FS_BASE()}/${p}`, { fields: toFields(obj) }));
-  const delDoc = (p) => (sb() ? sb().del(p) : fsCall('DELETE', `${FS_BASE()}/${p}`));
-  async function createDoc(col, id, obj) {
-    if (sb()) return sb().create(col, id, obj);
-    const j = await fsCall('POST', `${FS_BASE()}/${col}?documentId=${encodeURIComponent(id)}`, { fields: toFields(obj) });
-    return !j.exists;
-  }
+  const getDoc = async (p, auth = true) => plain(await sb().get(p, auth));
+  const setDoc = (p, obj) => sb().set(p, obj);
+  const delDoc = (p) => sb().del(p);
+  const createDoc = (col, id, obj) => sb().create(col, id, obj);
 
   // ------------------------------------------------------------ kullanıcı adları (herkese tekil)
   async function nameFree(name) {
@@ -141,34 +121,33 @@ module.exports = function createCloud(ctx) {
   function sessionFrom(res, user, provider, email) {
     const cloud = remember(res);
     const needsNick = user.nick === 0 || (user.nick === undefined && provider === 'google');
-    return { type: provider, id: cloud.uid, name: user.username, uuid: user.uuid, email: email || null, cloud, needsNick,
-      googleName: res.displayName || res.firstName || null, photo: res.photoUrl || null };
+    const meta = (res.user && res.user.user_metadata) || {};
+    return { type: provider, id: cloud.uid, name: user.username, uuid: user.uuid, email: email || (res.user && res.user.email) || null, cloud, needsNick,
+      googleName: meta.full_name || meta.name || null, photo: meta.avatar_url || meta.picture || null };
   }
 
   async function register({ username, email, password }) {
     if (!(await nameFree(username))) throw new Error('Bu kullanıcı adı alınmış, başka bir ad seç.');
-    const res = await authCall('signUp', { email, password, returnSecureToken: true });
+    const res = await authCall('signup', { email, password });
+    if (!res.access_token) throw new Error('Hesap açıldı. E-postana gelen doğrulama bağlantısına tıkla, sonra giriş yap.');
     remember(res);
-    try {
-      if (!(await reserveName(username, res.localId))) throw new Error('Bu kullanıcı adı az önce alındı, başka bir ad seç.');
-    } catch (e) {
-      await authCall('delete', { idToken: res.idToken }).catch(() => {});
-      throw e;
-    }
+    const uid = uidOf(res.user);
+    if (!(await reserveName(username, uid))) throw new Error('Bu kullanıcı adı az önce alındı. Giriş yapıp başka bir ad seçebilirsin.');
     const user = { username, uuid: crypto.randomUUID().replace(/-/g, ''), nick: 1 };
-    await setDoc(`users/${res.localId}`, { ...user, data: '', updated: 0 });
+    await setDoc(`users/${uid}`, { ...user, data: '', updated: 0 });
     return sessionFrom(res, user, 'local', email);
   }
 
   async function login({ email, password }) {
-    const res = await authCall('signInWithPassword', { email, password, returnSecureToken: true });
+    const res = await authCall('token?grant_type=password', { email, password });
     remember(res);
-    let user = await getDoc(`users/${res.localId}`);
+    const uid = uidOf(res.user);
+    let user = await getDoc(`users/${uid}`);
     if (!user) { // kayıt yarım kalmışsa
-      user = { username: await pickName(res.email.split('@')[0], res.localId), uuid: crypto.randomUUID().replace(/-/g, ''), nick: 0 };
-      await setDoc(`users/${res.localId}`, { ...user, data: '', updated: 0 });
+      user = { username: await pickName(String(res.user.email || email).split('@')[0], uid), uuid: crypto.randomUUID().replace(/-/g, ''), nick: 0 };
+      await setDoc(`users/${uid}`, { ...user, data: '', updated: 0 });
     }
-    return sessionFrom(res, user, 'local', res.email);
+    return sessionFrom(res, user, 'local', res.user.email || email);
   }
 
   async function pickName(wanted, uid) {
@@ -185,20 +164,18 @@ module.exports = function createCloud(ctx) {
   }
 
   async function loginGoogle(googleIdToken, googleName) {
-    const res = await authCall('signInWithIdp', {
-      postBody: `id_token=${encodeURIComponent(googleIdToken)}&providerId=google.com`,
-      requestUri: 'http://localhost', returnSecureToken: true, returnIdpCredential: true
-    });
+    const res = await authCall('token?grant_type=id_token', { provider: 'google', id_token: googleIdToken });
     remember(res);
-    let user = await getDoc(`users/${res.localId}`);
+    const uid = uidOf(res.user);
+    let user = await getDoc(`users/${uid}`);
     let isNew = false;
     if (!user) {
       // Google adı geçici olarak ayrılır; oyuncu ilk OYNA'da kendi nickname'ini seçer
-      user = { username: await pickName('Oyuncu_' + res.localId.slice(0, 6), res.localId), uuid: crypto.randomUUID().replace(/-/g, ''), nick: 0 };
-      await setDoc(`users/${res.localId}`, { ...user, data: '', updated: 0 });
+      user = { username: await pickName('Oyuncu_' + uid.replace(/-/g, '').slice(0, 6), uid), uuid: crypto.randomUUID().replace(/-/g, ''), nick: 0 };
+      await setDoc(`users/${uid}`, { ...user, data: '', updated: 0 });
       isNew = true;
     }
-    const acc = sessionFrom(res, user, 'google', res.email);
+    const acc = sessionFrom(res, user, 'google', res.user && res.user.email);
     acc.isNew = isNew;
     return acc;
   }
@@ -213,7 +190,18 @@ module.exports = function createCloud(ctx) {
     if (keepOld !== true && newName.toLowerCase() !== a.name.toLowerCase()) await delDoc(`usernames/${a.name.toLowerCase()}`).catch(() => {});
   }
 
-  const resetPassword = (email) => authCall('sendOobCode', { requestType: 'PASSWORD_RESET', email });
+  // şifre sıfırlama: e-postaya 6 haneli kod gider (Supabase > Authentication > Emails > Reset Password şablonunda {{ .Token }}),
+  // oyuncu kodu ve yeni şifresini launcher'a yazar. Tarayıcıda açılacak bir sayfa gerekmez.
+  const resetPassword = (email) => authCall('recover', { email });
+  async function resetConfirm({ email, code, password }) {
+    if (!/^\d{6,8}$/.test(String(code || '').trim())) throw new Error('E-postadaki kodu yaz.');
+    if (String(password || '').length < 6) throw new Error('Şifre en az 6 karakter olmalı.');
+    const s = await authCall('verify', { type: 'recovery', email, token: String(code).trim() }).catch((e) => {
+      throw /expired|invalid|otp/i.test(e.message) ? new Error('Kod hatalı ya da süresi dolmuş. Yeni kod iste.') : e;
+    });
+    await authCall('user', { password }, s.access_token, 'PUT');
+    return true;
+  }
 
   // ------------------------------------------------------------ mod tanıma (Modrinth hash)
   let cache = null;
@@ -348,7 +336,7 @@ module.exports = function createCloud(ctx) {
 
   // ------------------------------------------------------------ eşitleme
   let pushTimer = null, busy = Promise.resolve();
-  const isCloudAccount = () => { const a = getConfig().account; return enabled() && !!(a && a.cloud); };
+  const isCloudAccount = () => { const a = getConfig().account; return enabled() && !!(a && a.cloud && a.cloud.sb); };
   const queue = (fn) => (busy = busy.then(fn, fn));
 
   async function markManifest() {
@@ -456,8 +444,9 @@ module.exports = function createCloud(ctx) {
     await setDoc(`sprays/${name.toLowerCase()}`, { uid: a.id, name, x: p.x, y: p.y, z: p.z, d: p.d, r: p.r, t: Date.now() });
   }
   const deleteCosmetics = (name) => delDoc(`cosmetics/${name.toLowerCase()}`).catch(() => {});
-  const publicConfig = () => (enabled() ? { projectId: cfg().projectId, apiKey: cfg().apiKey } : null);
+  // oyundaki mod için: bulut okumaları launcher'daki yerel köprüden yapılır (fsBase main.js'te eklenir)
+  const publicConfig = () => (enabled() ? { projectId: 'cubixora', apiKey: 'local' } : null);
   const releaseName = (name) => delDoc(`usernames/${name.toLowerCase()}`).catch(() => {});
   const uid = () => { const a = getConfig().account; return a && a.cloud ? a.id : null; };
-  return { token, uid, cfg, sb, releaseName, reserveName, nameFree, saveCosmetics, setEmote, setSpray, loadCosmetics, deleteCosmetics, publicConfig, idle, enabled, isCloudAccount, register, login, loginGoogle, rename, resetPassword, push, pull, schedulePush, rememberMod, forget };
+  return { token, uid, cfg, sb, releaseName, reserveName, nameFree, saveCosmetics, setEmote, setSpray, loadCosmetics, deleteCosmetics, publicConfig, idle, enabled, isCloudAccount, register, login, loginGoogle, rename, resetPassword, resetConfirm, push, pull, schedulePush, rememberMod, forget };
 };
