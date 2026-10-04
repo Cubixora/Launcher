@@ -1404,7 +1404,7 @@ else {
     if (!PREVIEW) createTray();
     if (cloud.isCloudAccount()) win.webContents.once('did-finish-load', () => { startSocial(); setTimeout(() => cloud.pull(), 2500); });
     if (global.__cubixora) global.__cubixora.onUpdateReady((info) => send('app:update', info));
-    // Anlık güncelleme: pencere açıkken 30 sn'de bir tek küçük belge sorgulanır; yeni paket varsa hemen indirilir
+    // Güncelleme: pencere açıkken 3 dk'da bir tek küçük belge sorgulanır (okuma kotası); yeni paket varsa hemen indirilir
     if (global.__cubixora && !PREVIEW) {
       let chk = false;
       setInterval(async () => {
@@ -1412,7 +1412,7 @@ else {
         chk = true;
         try { await global.__cubixora.checkUpdate(); } catch (e) { /* ağ yok: sonra tekrar */ }
         chk = false;
-      }, 30 * 1000);
+      }, 3 * 60 * 1000);
     }
   });
   // kapanırken "çevrimdışı" bilgisi gitsin diye en fazla 1.5 sn beklenir

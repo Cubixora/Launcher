@@ -21,15 +21,18 @@ const Social = (() => {
     } catch (e) { console.warn(e); }
     renderAccount(); applyLook();
     refreshAll();
-    // pencere gizliyken (oyundayken / küçültülmüşken) boşuna istek atılmaz
-    const vis = (fn) => () => { if (!document.hidden) fn(); };
-    timers.push(setInterval(vis(refreshFriends), 30000));
-    timers.push(setInterval(vis(refreshConvs), 25000));
-    timers.push(setInterval(vis(refreshNotifs), 120000));
-    if (!visBound) { visBound = true; document.addEventListener('visibilitychange', () => { if (!document.hidden && timers.length) refreshAll(); }); }
+    // Okuma kotası: anlık değişiklikler (mesaj, istek, grup, bildirim) sinyalle hemen gelir; buradaki yoklamalar sadece yedek.
+    // Pencere gizliyken hiç sorgu atılmaz, pencere geri açılınca süresi geçenler bir kez yenilenir.
+    const last = { f: Date.now(), c: Date.now(), n: Date.now() };
+    const every = { f: 3 * 60000, c: 3 * 60000, n: 10 * 60000 };
+    const run = { f: refreshFriends, c: refreshConvs, n: refreshNotifs };
+    const due = (force) => { if (document.hidden) return; const t = Date.now(); for (const k of Object.keys(run)) if (force ? t - last[k] > 60000 : t - last[k] >= every[k]) { last[k] = t; run[k](); } };
+    timers.push(setInterval(() => due(false), 30000));
+    visDue = due;
+    if (!visBound) { visBound = true; document.addEventListener('visibilitychange', () => { if (!document.hidden && timers.length && visDue) visDue(true); }); }
     renderPartners();
   }
-  let visBound = false;
+  let visBound = false, visDue = null;
   function stop() { timers.forEach(clearInterval); timers = []; }
   function renderLocked() {
     $('#spLocked').classList.toggle('hidden', !!(S.account && S.account.cloud));
@@ -91,6 +94,8 @@ const Social = (() => {
   }
 
   // ---------------------------------------------------------- sohbet listesi
+  let convT = null;
+  function convSoon() { clearTimeout(convT); convT = setTimeout(refreshConvs, 2500); }   // art arda gelen mesajlar tek sorguda birleşir
   async function refreshConvs() {
     try { convs = await sc('conversations'); } catch { return; }
     renderGroups(); renderRecent();
@@ -187,7 +192,7 @@ const Social = (() => {
     switch (sig.type) {
       case 'message':
         Chat.onIncoming(sig);
-        refreshConvs();
+        convSoon();
         break;
       case 'call': Call.onSignal(sig); break;
       case 'voice': if (window.GameVoice) GameVoice.onSignal(sig); break;

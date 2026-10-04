@@ -889,7 +889,7 @@ setInterval(() => {
 
 
 // ------------------------------------------------------------ yönetici değişiklikleri canlı yansır
-// Mağaza / pelerin ayarı değiştiyse açık sayfa kendiliğinden yenilenir (20 sn'de bir hafif kontrol).
+// Mağaza / pelerin ayarı değiştiyse açık sayfa kendiliğinden yenilenir (dakikada bir hafif kontrol; mağaza ayarı 2 dk önbellekte).
 (() => {
   let sig = null, busy = false;
   const live = ['shop', 'inventory', 'cosmetics'];
@@ -907,5 +907,5 @@ setInterval(() => {
       sig = now;
     } catch (e) { /* ağ yok: sonra tekrar */ }
     busy = false;
-  }, 20000);
+  }, 60000);
 })();

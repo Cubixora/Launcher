@@ -71,7 +71,7 @@ module.exports = function createSocial(ctx) {
 
   // ------------------------------------------------------------ önbellek ve uzaktan ayarlar
   const cache = { profile: null, wallet: null, inventory: null, privates: null, config: {}, profiles: new Map(), presence: {} };
-  async function remote(name, fallback, maxAge = name === 'shop' ? 15 * 1000 : 60 * 1000) {   // yönetici değişikliği en geç 15 sn (mağaza) / 1 dk (diğerleri) içinde herkese ulaşır
+  async function remote(name, fallback, maxAge = name === 'shop' ? 2 * 60 * 1000 : 10 * 60 * 1000) {   // okuma kotası için: mağaza 2 dk, diğer ayarlar 10 dk önbellekte (adminin kendi değişikliği anında yansır)
     const c = cache.config[name];
     if (c && now() - c.at < maxAge) return c.value;
     try {
@@ -432,7 +432,7 @@ module.exports = function createSocial(ctx) {
     return 'none';
   }
   async function loadProfiles(uids) {
-    const need = uids.filter((u) => !cache.profiles.has(u) || now() - cache.profiles.get(u)._at > 60000);
+    const need = uids.filter((u) => !cache.profiles.has(u) || now() - cache.profiles.get(u)._at > 5 * 60 * 1000);
     if (need.length) {
       const docs = await db.batchGet(need.map((u) => `profiles/${u}`));
       for (const d of docs) cache.profiles.set(d.id, { ...d, _at: now() });
@@ -637,10 +637,12 @@ module.exports = function createSocial(ctx) {
   }
 
   // ------------------------------------------------------------ bildirimler
+  let notifGlobal = { at: 0, list: [] };
   async function notifications() {
     const uid = me(); if (!uid) return [];
     const [global, inbox] = await Promise.all([
-      db.query('notifications', { orderBy: [['at', 'desc']], limit: 20 }).catch(() => []),
+      (notifGlobal.at && now() - notifGlobal.at < 5 * 60 * 1000) ? notifGlobal.list
+        : db.query('notifications', { orderBy: [['at', 'desc']], limit: 20 }).then((l) => { notifGlobal = { at: now(), list: l }; return l; }).catch(() => notifGlobal.list),
       db.query(`inbox/${uid}/items`, { orderBy: [['at', 'desc']], limit: 30 }).catch(() => [])
     ]);
     const seen = (getConfig().social || {}).notifSeen || 0;
@@ -856,7 +858,7 @@ module.exports = function createSocial(ctx) {
   // ------------------------------------------------------------ görevler ve seviye ağacı
   const levelCoins = (n) => (n % 5 === 0 ? 50 : 10);
   const TIERS = [['Bronz', 1], ['Gümüş', 10], ['Altın', 25], ['Platin', 50], ['Elmas', 100], ['Usta', 150], ['Efsane', 200]];
-  const quests = async () => ((await remote('quests', { events: {} }, 30 * 1000)) || { events: {} });
+  const quests = async () => ((await remote('quests', { events: {} }, 5 * 60 * 1000)) || { events: {} });
   const eventLive = (e) => e && e.active !== false && (!e.startsAt || now() >= e.startsAt) && (!e.endsAt || now() < e.endsAt);
   let qpTimer = null;
   async function questBump(stat, n = 1, absolute = false) {
@@ -918,7 +920,7 @@ module.exports = function createSocial(ctx) {
   async function reward(kind, a) { send('social:reward', { kind, ...a }); }
   async function claimQuestStep(eid, sid) {
     const uid = me(); if (!uid) throw new Error('Giriş yapmalısın.');
-    const cfg = await remote('quests', { events: {} }, 30 * 1000);
+    const cfg = await remote('quests', { events: {} }, 5 * 60 * 1000);
     const e = (cfg.events || {})[eid], s = e && (e.steps || {})[sid];
     if (!s || !eventLive(e)) throw new Error('Bu görev artık aktif değil.');
     const progress = ((((cache.privates && cache.privates.qp) || {})[eid]) || {})[s.stat] || 0;
@@ -941,7 +943,7 @@ module.exports = function createSocial(ctx) {
   }
   async function claimQuestReward(eid) {
     const uid = me(); if (!uid) throw new Error('Giriş yapmalısın.');
-    const cfg = await remote('quests', { events: {} }, 30 * 1000);
+    const cfg = await remote('quests', { events: {} }, 5 * 60 * 1000);
     const e = (cfg.events || {})[eid];
     if (!e || !e.rewardItem) throw new Error('Bu görevin bir ödülü yok.');
     const sids = Object.keys(e.steps || {});
@@ -1005,7 +1007,7 @@ module.exports = function createSocial(ctx) {
     if (to) {
       await db.commit([{ set: `inbox/${to}/items/${crypto.randomBytes(8).toString('hex')}`, data: { ...data, read: false }, serverTime: ['at'], exists: false }]);
       signal(to, { type: 'notification', title: data.title }).catch(() => {});
-    } else await db.commit([{ set: `notifications/${crypto.randomBytes(8).toString('hex')}`, data, serverTime: ['at'], exists: false }]);
+    } else { await db.commit([{ set: `notifications/${crypto.randomBytes(8).toString('hex')}`, data, serverTime: ['at'], exists: false }]); notifGlobal.at = 0; }
     return true;
   }
   // hata bildirimleri (oyundaki "Hata Bildir")
@@ -1023,7 +1025,7 @@ module.exports = function createSocial(ctx) {
     return l.sort((a, b) => (b.at || 0) - (a.at || 0));
   }
   async function adminDeleteReport(id) { needAdmin(); await db.del(`reports/${String(id).replace(/[^a-z0-9]/gi, '')}`); return true; }
-  async function adminDeleteNotification(id) { needAdmin(); await db.del(`notifications/${id}`); return true; }
+  async function adminDeleteNotification(id) { needAdmin(); await db.del(`notifications/${id}`); notifGlobal.at = 0; return true; }
   async function adminUser(q) {
     needAdmin();
     q = String(q || '').trim().toLowerCase().replace(/^@/, '');
@@ -1201,8 +1203,8 @@ module.exports = function createSocial(ctx) {
   function fmtMin(m) { m = Math.round(m); if (m < 60) return `${m} dakika`; const h = Math.floor(m / 60), r = m % 60; return r ? `${h} saat ${r} dakika` : `${h} saat`; }
   const STAT_TITLE = (stat, goal) => (STAT_NAMES[stat] ? STAT_NAMES[stat](goal) : `${stat}: ${goal}`);
   let gwCache = { at: 0, list: [] }, gwInflight = null;
-  async function giveaways(force) {
-    if (!force && gwCache.at && now() - gwCache.at < 60 * 1000) return gwCache.list;
+  async function giveaways(force, maxAge = 60 * 1000) {
+    if (!force && gwCache.at && now() - gwCache.at < maxAge) return gwCache.list;
     if (gwInflight) return gwInflight;   // aynı anda gelen istekler tek sorguda birleşir
     gwInflight = db.query('giveaways').then((list) => { gwCache = { at: now(), list }; return list; })
       .catch((e) => { if (!gwCache.at) throw e; return gwCache.list; })
@@ -1339,7 +1341,9 @@ module.exports = function createSocial(ctx) {
     gwBusy = true;
     try {
       const before = JSON.stringify(gwCache.list.map((g) => [g.id, g.status, g.entries]));
-      const list = await giveaways(true);
+      // okuma kotası: normal oyuncu 10 dk'da bir, admin 2 dk'da bir; kura saati geçmiş çekiliş varsa 2 dk'da bir bakılır
+      const due = gwCache.list.some((g) => g.status !== 'drawn' && g.drawAt && now() >= g.drawAt);
+      const list = await giveaways(false, isAdmin() || due ? 2 * 60 * 1000 : 10 * 60 * 1000);
       if (isAdmin()) {
         for (const g of list) {
           if (g.status !== 'drawn' && g.drawAt && now() >= g.drawAt) await adminGiveawayDraw(g.id).catch((e) => log(`[çekiliş] kura: ${e.message}`));

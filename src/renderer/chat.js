@@ -59,7 +59,7 @@ const Chat = (() => {
     $('#chatLocked').classList.toggle('hidden', canWrite);
     if (canWrite) $('#chatText').focus();
     clearInterval(poll);
-    poll = setInterval(() => { if (!document.hidden) fetchNew(); }, 8000);
+    poll = setInterval(() => { if (!document.hidden) fetchNew(); }, 45000);   // yeni mesajlar sinyalle anında gelir; bu sadece yedek
   }
   function renderHead() {
     const c = active;
