@@ -101,10 +101,11 @@ public final class CxEmoteNet {
                     JsonObject f = d.getAsJsonObject("fields");
                     if (f == null || !f.has("t")) continue;
                     long t = Long.parseLong(f.getAsJsonObject("t").get("integerValue").getAsString());
+                    // yaş sunucu saatiyle ölçülür: iki bilgisayarın saati farklıysa sprey/emote hiç görünmüyordu
+                    long age = serverAge(o, d, t);
                     if (spray) {
                         Long sp = LAST.put("s:" + n, t);
-                        long age = System.currentTimeMillis() - t;
-                        if ((sp == null || sp != t) && age < 9000 && age > -3000) {
+                        if ((sp == null || sp != t) && age < CxSpray.LIFE_MS - 300 && age > -3000) {
                             final int x = num(f, "x"), y = num(f, "y"), z = num(f, "z"), dd = num(f, "d"), rr = num(f, "r");
                             final long left = CxSpray.LIFE_MS - Math.max(0, age);
                             Minecraft.getInstance().execute(() -> CxSpray.spawn(n, x, y, z, dd, rr, left));
@@ -113,13 +114,22 @@ public final class CxEmoteNet {
                     }
                     String id = f.has("id") ? f.getAsJsonObject("id").get("stringValue").getAsString() : "";
                     Long prev = LAST.put(n, t);
-                    boolean fresh = prev == null ? (System.currentTimeMillis() - t) < 4000 : prev != t;   // ilk görüşte sadece taze emote
+                    boolean fresh = prev == null ? age < 4000 : prev != t;   // ilk görüşte sadece taze emote
                     if (!fresh) continue;
                     if (id.isEmpty()) CxEmoteAnim.stop(n); else CxEmoteAnim.start(n, id);
                 }
             } catch (Throwable ex) { Cubixora.LOG.debug("emote yoklama", ex); }
             finally { inFlight = false; }
         });
+    }
+
+    /** Belgenin yaşı Firestore sunucu saatine göre (updateTime -> readTime). Bilgisayar saatleri farklı olsa da doğru çalışır. */
+    private static long serverAge(JsonObject o, JsonObject d, long t) {
+        try {
+            if (o.has("readTime") && d.has("updateTime"))
+                return java.time.Duration.between(java.time.Instant.parse(d.get("updateTime").getAsString()), java.time.Instant.parse(o.get("readTime").getAsString())).toMillis();
+        } catch (Throwable ignored) {}
+        return System.currentTimeMillis() - t;
     }
 
     private static int num(JsonObject f, String k) { return f.has(k) ? Integer.parseInt(f.getAsJsonObject(k).get("integerValue").getAsString()) : 0; }

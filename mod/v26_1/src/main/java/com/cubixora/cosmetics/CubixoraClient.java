@@ -10,6 +10,7 @@ import net.minecraft.network.chat.Component;
 import com.mojang.blaze3d.platform.InputConstants;
 
 public final class CubixoraClient implements ClientModInitializer {
+    private static int cursorPoll;
     @Override
     public void onInitializeClient() {
         CosmeticsManager.init();
@@ -32,6 +33,8 @@ public final class CubixoraClient implements ClientModInitializer {
             com.cubixora.client.CxUi.preloadStep(client);
             com.cubixora.client.CxEmote.tick(client);
             com.cubixora.client.CxWindow.tick(client);
+            com.cubixora.client.CxCursor.frame();
+            if (++cursorPoll >= 40) { cursorPoll = 0; com.cubixora.client.CxCursor.poll(); }
             while (reloadKey.consumeClick()) {
                 CosmeticsManager.reloadAll();
                 if (client.player != null) client.player.sendOverlayMessage(Component.literal("§fCubixora kozmetikleri yenilendi"));

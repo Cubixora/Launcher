@@ -139,7 +139,10 @@ const cloud = require('./cloud')({
   log, send, profileDir, downloadFile
 });
 
-const social = require('./social')({ cloud, getConfig: () => config, saveConfig, send, log, protect, unprotect, DATA_DIR, app });
+// oyun içi üst bildirimler (görev tamamlandı, çekiliş kazandın): mod 100 ms'de bir köprüye uğrar, kuyruktan birer birer alır
+const modToasts = [];
+const modToast = (t, s) => { if (gameRunning) { modToasts.push({ t: String(t || '').slice(0, 60), s: String(s || '').slice(0, 90) }); if (modToasts.length > 6) modToasts.shift(); } };
+const social = require('./social')({ cloud, getConfig: () => config, saveConfig, send, log, protect, unprotect, DATA_DIR, app, modToast });
 const discord = require('./discord')({ remote: (...a) => social.remote(...a), getSettings: () => config.settings, log });
 const features = require('./features')({
   getJSON, downloadFile, profileDir, findProfile: (id) => findProfile(id), log, send, unprotect, UA,
@@ -1013,6 +1016,13 @@ function bridgeInfo() {
             await cloud.setSpray(config.account.name, data);
             return reply(200, { ok: true });
           }
+          if (req.url === '/cursor') {
+            // imleç: oyunda seçilen launcher'a, launcher'da seçilen oyuna geçer
+            if (typeof data.id === 'string' && /^[a-z0-9_]{0,24}$/.test(data.id) && data.id !== (config.settings.cursor || '')) {
+              config.settings.cursor = data.id; saveConfig(); send('settings:cursor', data.id);
+            }
+            return reply(200, { cur: config.settings.cursor || '' });
+          }
           if (req.url === '/report') {
             if (!cloud.isCloudAccount()) return reply(400, { error: 'Bildirim göndermek için Google ya da e-posta ile giriş yapmalısın.' });
             await social.submitReport({ category: data.category, text: data.text, version: data.version });
@@ -1036,7 +1046,9 @@ function bridgeInfo() {
               if (key !== voiceCtlKey || Date.now() - voiceCtlSent > 400) { voiceCtlKey = key; voiceCtlSent = Date.now(); send('voice:ctl', ctl); }
               if (!voiceThrottleOff) { voiceThrottleOff = true; try { win.webContents.setBackgroundThrottling(false); } catch {} }
             }
-            return reply(200, Date.now() - voiceState.at < 1500 ? voiceState : { on: false });
+            if (typeof data.srv === 'string') partnerTick(data.srv);
+            const vs = Date.now() - voiceState.at < 1500 ? voiceState : { on: false };
+            return reply(200, modToasts.length ? { ...vs, toast: modToasts.shift() } : vs);
           }
           if (req.url === '/buy') {
             if (!cloud.isCloudAccount()) return reply(400, { error: 'Mağaza için Google ya da e-posta ile giriş yapmalısın.' });
@@ -1077,7 +1089,7 @@ async function writeClientJson(p, gameDir) {
   }
   await fsp.mkdir(path.dirname(f), { recursive: true });
   const br = await bridgeInfo();
-  await fsp.writeFile(f, JSON.stringify({ enabled: true, name: config.account ? config.account.name : '', coins, plus, friends, news, bridge: br }));
+  await fsp.writeFile(f, JSON.stringify({ enabled: true, name: config.account ? config.account.name : '', coins, plus, friends, news, bridge: br, cursor: config.settings.cursor || '' }));
 }
 
 // ---------------------------------------------------------------- launch
@@ -1191,6 +1203,9 @@ async function launchProfileInner(profileId, opt = {}) {
     social.setGame(''); discord.setMenu();
     const minutes = Math.round((Date.now() - started) / 60000);
     if (minutes > 0) social.track('minutes', minutes);
+    // mod olmadan (Cubixora dışı profil) partner sunucusuna direkt girildiyse süreyi kapanışta say
+    if (minutes > 0 && opt.server && !partnerSeen) social.track('partner_minutes', minutes);
+    partnerSeen = false;
     send('game-state', { running: false, code });
     cloud.schedulePush();
     if (config.settings.closeOnLaunch && win && !win.isDestroyed()) win.show();
@@ -1442,6 +1457,24 @@ function vlog(m) {
     fs.appendFileSync(f, `[${new Date().toISOString().slice(11, 19)}] ${m}\n`);
   } catch {}
 }
+// Partner sunucusunda geçen süre: oyundaki mod bağlı olduğu sunucuyu bildirir, partner listesindeyse dakikada 1 sayılır
+let partnerSeen = false, partnerAt = 0, partnerHosts = { at: 0, list: [] };
+const hostOf = (a) => String(a || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/:\d+$/, '').replace(/\.$/, '');
+async function isPartnerHost(h) {
+  if (!h) return false;
+  if (Date.now() - partnerHosts.at > 5 * 60 * 1000) {
+    partnerHosts.at = Date.now();
+    try { partnerHosts.list = ((await social.partners()) || []).filter((p) => p.active !== false).map((p) => hostOf(p.ip)).filter(Boolean); } catch {}
+  }
+  return partnerHosts.list.some((p) => h === p || h.endsWith('.' + p) || p.endsWith('.' + h));
+}
+function partnerTick(srv) {
+  const now = Date.now();
+  if (!partnerAt || now - partnerAt > 3 * 60 * 1000) { partnerAt = now; return; }   // ilk görüş / uzun aradan sonra: sayaç baştan
+  if (now - partnerAt < 60 * 1000) return;
+  partnerAt = now;
+  isPartnerHost(hostOf(srv)).then((ok) => { if (ok) { partnerSeen = true; social.track('partner_minutes', 1); } }).catch(() => {});
+}
 let voiceState = { on: false, at: 0 }, voiceWant = 0, voiceMuteKey = '', voiceDevices = { inputs: [], outputs: [] }, voiceCtlAt = 0, voiceCtlKey = '', voiceCtlSent = 0, voiceThrottleOff = false;
 // süreli (görev ödülü) pelerin/kanat süresi dolunca otomatik çıkarılır; oyundaki ve launcher'daki görünüm de güncellenir
 setInterval(async () => {
@@ -1631,6 +1664,7 @@ const SOCIAL_API = ['summary', 'refreshMe', 'updateProfile', 'getProfile', 'setS
   'shop', 'buy', 'redeem', 'partners', 'limits', 'addBetaKey', 'betaInfo', 'presets', 'track', 'signal',
   'adminReports', 'adminDeleteReport', 'adminGet', 'adminSet', 'adminNotify', 'adminDeleteNotification', 'adminUser', 'adminGrant', 'adminTake', 'coinBuy', 'adminRevoke', 'adminBan', 'adminBannedEmails', 'adminBanEmail', 'adminUnbanEmail', 'adminDeleteUser', 'adminSetRoles',
   'news', 'adminNewsList', 'adminNewsSave', 'adminNewsDelete', 'questView', 'claimQuestStep', 'claimQuestReward', 'levelView', 'claimLevel',
+  'giveawayView', 'joinGiveaway', 'adminGiveaways', 'adminGiveawaySave', 'adminGiveawayEntries', 'adminGiveawayDraw', 'adminGiveawayDelete',
   'uidOf', 'adminCodes', 'adminSaveCode', 'adminDeleteCode', 'adminBetaKeys', 'adminSaveBetaKey', 'adminDeleteBetaKey', 'adminPublish'];
 handle('social:call', async (fn, ...args) => {
   if (!SOCIAL_API.includes(fn)) throw new Error('Bilinmeyen işlem: ' + fn);

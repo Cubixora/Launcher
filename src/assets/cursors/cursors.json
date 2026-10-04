@@ -1,0 +1,104 @@
+[
+ {
+  "id": "altin",
+  "name": "Altın Ok",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "neon",
+  "name": "Neon Mor",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "buz",
+  "name": "Buz Mavisi",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "lav",
+  "name": "Lav",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "zumrut",
+  "name": "Zümrüt",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "gokkusagi",
+  "name": "Gökkuşağı",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "galaksi",
+  "name": "Galaksi",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "cubixora",
+  "name": "Cubixora",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "klasik",
+  "name": "Retro Beyaz",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "gece",
+  "name": "Gece Siyahı",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "pati",
+  "name": "Pembe Pati",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "kalp",
+  "name": "Kalpli",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "kedi",
+  "name": "Kedi Rozetli",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "yildiz",
+  "name": "Yıldız Değneği",
+  "x": 4,
+  "y": 4
+ },
+ {
+  "id": "kilic",
+  "name": "Piksel Kılıç",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "hayalet",
+  "name": "Sevimli Hayalet",
+  "x": 1,
+  "y": 1
+ },
+ {
+  "id": "cilek",
+  "name": "Çilek",
+  "x": 1,
+  "y": 1
+ }
+]

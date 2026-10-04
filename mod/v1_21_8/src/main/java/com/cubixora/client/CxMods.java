@@ -203,7 +203,7 @@ public final class CxMods {
             cfgJ.addProperty("vad", vs.vadThreshold); cfgJ.addProperty("outVol", vs.outVolume); cfgJ.addProperty("micVol", vs.micVolume); cfgJ.addProperty("bitrate", vs.bitrate);
             cfgJ.addProperty("micDev", vs.micDevice == null ? "" : vs.micDevice); cfgJ.addProperty("outDev", vs.outDevice == null ? "" : vs.outDevice);
             cfgJ.addProperty("aec", vs.aec); cfgJ.addProperty("ans", vs.ans); cfgJ.addProperty("agc", vs.agc);
-            String body = "{\"mute\":" + CxPlayersScreen.mutedJson() + ",\"ptt\":" + vHeld + ",\"s\":" + cfgJ + ",\"peers\":" + CxEmoteNet.voicePeersJson() + ",\"d\":{\"held\":" + vHeld + ",\"ptt\":" + vs.ptt() + ",\"cx\":" + cxNames.size() + ",\"von\":" + vOn + ",\"spk\":" + vSpkN.size() + ",\"age\":" + (vSeen == 0 ? -1 : System.currentTimeMillis() - vSeen) + ",\"hud\":" + on("voice") + "}}";
+            String body = "{\"mute\":" + CxPlayersScreen.mutedJson() + ",\"ptt\":" + vHeld + ",\"s\":" + cfgJ + ",\"peers\":" + CxEmoteNet.voicePeersJson() + ",\"d\":{\"held\":" + vHeld + ",\"ptt\":" + vs.ptt() + ",\"cx\":" + cxNames.size() + ",\"von\":" + vOn + ",\"spk\":" + vSpkN.size() + ",\"age\":" + (vSeen == 0 ? -1 : System.currentTimeMillis() - vSeen) + ",\"hud\":" + on("voice") + "},\"srv\":\"" + srvJson(mc) + "\"}";
             CxBridge.raw("/voice", body, o -> {
                 vBusy = false;
                 if (o == null) return;
@@ -222,6 +222,7 @@ public final class CxMods {
                 vPeer = o.has("peer") && !o.get("peer").isJsonNull() ? o.get("peer").getAsString() : "";
                 if (!o.has("speakers") && vPeerSpeaking && !vPeer.isEmpty()) { vSpkN = new ArrayList<>(java.util.List.of(vPeer)); vSpkL = new ArrayList<>(java.util.List.of(vPeerLevel)); }
                 vSeen = System.currentTimeMillis();
+                if (o.has("toast") && o.get("toast").isJsonObject()) { var to = o.getAsJsonObject("toast"); CxToast.push(to.has("t") ? to.get("t").getAsString() : "", to.has("s") ? to.get("s").getAsString() : ""); }
             });
         }
         if (now - mediaPoll > 3000 && on("media") && CxBridge.available()) {
@@ -264,6 +265,11 @@ public final class CxMods {
             if (mc.currentScreen != null) continue;
             cf.on = !cf.on; toggled(mc, get("fullbright"), cf.on); CxClient.save();
         }
+    }
+
+    /** Bağlı olunan sunucu adresi (partner sunucu süresi için); JSON'a güvenli. */
+    private static String srvJson(MinecraftClient mc) {
+        try { String a = com.cubixora.cosmetics.Compat.serverAddress(mc); return a == null ? "" : a.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9._:\\-\\[\\]]", ""); } catch (Throwable t) { return ""; }
     }
 
     private static boolean reservedKey(int k) {
@@ -844,7 +850,9 @@ public final class CxMods {
         if (!CxClient.enabled || mc.player == null) return;
         sample(mc);
         control(mc);
+        CxToast.render(c);   // üst bildirim (HUD gizliyken de görünür)
         if (mc.options.hudHidden || mc.getDebugHud().shouldShowDebugHud()) return;
+        if (CxCrosshair.active() && mc.options.getPerspective().isFirstPerson()) CxCrosshair.draw(c, mc.getWindow().getScaledWidth() / 2, mc.getWindow().getScaledHeight() / 2, CxClient.settings, 1);
         if (mc.currentScreen instanceof CxHudEditor || mc.currentScreen instanceof CxModsScreen) return;
         int sw = mc.getWindow().getScaledWidth(), sh = mc.getWindow().getScaledHeight();
         TextRenderer tr = mc.textRenderer;

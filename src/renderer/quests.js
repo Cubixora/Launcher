@@ -6,6 +6,7 @@ const Quests = (() => {
 
   async function enter(silent) {
     const body = $('#questBody');
+    if (typeof Giveaways !== 'undefined') Giveaways.enter(silent);
     if (!S.social) { body.innerHTML = '<div class="empty"><div class="empty-ic">🔒</div><h3>Görevler kapalı</h3><p>Görev yapmak için Google ya da Cubixora (e-posta) hesabıyla giriş yap.</p></div>'; return; }
     if (!silent) body.innerHTML = '<div class="skeleton"></div>'.repeat(2);
     try { data = await sc('questView'); } catch (e) { body.innerHTML = `<div class="empty"><p>${esc(e.message)}</p></div>`; return; }

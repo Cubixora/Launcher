@@ -1,6 +1,8 @@
 /* Ayarlar penceresi */
 const Settings = (() => {
   let tab = 'game', logBuf = '', bound = false, micTest = null;
+  // Cubixora imleçleri (dosyalar: assets/cursors; oyundaki modda da aynı liste var)
+  const curList = [{"id": "altin", "name": "Altın Ok"}, {"id": "neon", "name": "Neon Mor"}, {"id": "buz", "name": "Buz Mavisi"}, {"id": "lav", "name": "Lav"}, {"id": "zumrut", "name": "Zümrüt"}, {"id": "gokkusagi", "name": "Gökkuşağı"}, {"id": "galaksi", "name": "Galaksi"}, {"id": "cubixora", "name": "Cubixora"}, {"id": "klasik", "name": "Retro Beyaz"}, {"id": "gece", "name": "Gece Siyahı"}, {"id": "pati", "name": "Pembe Pati"}, {"id": "kalp", "name": "Kalpli"}, {"id": "kedi", "name": "Kedi Rozetli"}, {"id": "yildiz", "name": "Yıldız Değneği"}, {"id": "kilic", "name": "Piksel Kılıç"}, {"id": "hayalet", "name": "Sevimli Hayalet"}, {"id": "cilek", "name": "Çilek"}];
   const sw = (id, on) => `<label class="switch"><input type="checkbox" id="${id}" ${on ? 'checked' : ''} /><span></span></label>`;
   const row = (title, sub, ctl) => `<div class="s-row"><div><b>${title}</b>${sub ? `<small>${sub}</small>` : ''}</div><div class="s-ctl">${ctl}</div></div>`;
   const sec = (t) => `<div class="s-sec">${t}</div>`;
@@ -43,6 +45,21 @@ const Settings = (() => {
   }
 
   const RENDER = {
+    // ------------------------------------------------------------ İmleç (oyunla eşitlenir)
+    async cursor(box) {
+      const cur = st().cursor || '';
+      const cardHtml = (c) => `<button class="cur-card ${c.id === cur ? 'on' : ''}" data-cur="${esc(c.id)}" ${c.id ? `style="--cx-cur:${cursorCss(c.id)}, auto;cursor:${cursorCss(c.id)}, auto"` : ''}>
+        <span class="cur-prev ${c.id ? '' : 'sys'}">${c.id ? `<img src="../assets/cursors/${esc(c.id)}@2x.png" alt="" draggable="false" loading="lazy" />` : '⌁'}</span><b>${esc(c.name)}</b></button>`;
+      box.innerHTML = sec('FARE İMLECİ') + `<p class="cur-hint">Launcher'da ve Cubixora ile açılan oyunun menülerinde kullanılır. Oyun içinden (Cubixora Ayarları &gt; Görünüm &gt; İmleç) değiştirirsen burada da değişir. Denemek için farenle kartın üstüne gel.</p>`
+        + `<div class="cur-grid">${[{ id: '', name: 'Sistem (varsayılan)' }, ...curList].map(cardHtml).join('')}</div>`;
+      box.querySelector('.cur-grid').onclick = async (e) => {
+        const b = e.target.closest('[data-cur]'); if (!b || b.classList.contains('on')) return;
+        box.querySelectorAll('.cur-card.on').forEach((x) => x.classList.remove('on')); b.classList.add('on');
+        applyCursor(b.dataset.cur);
+        await save({ cursor: b.dataset.cur });
+      };
+    },
+
     // ------------------------------------------------------------ Oyun
     game(box) {
       const s = st();
@@ -371,5 +388,5 @@ const Settings = (() => {
     const el = $('#log');
     if (el && !$('#settingsWin').classList.contains('hidden') && tab === 'log') { el.textContent = logBuf; el.scrollTop = el.scrollHeight; }
   });
-  return { open, close, onSync };
+  return { open, close, onSync, refreshCursor: () => { if (!$('#settingsWin').classList.contains('hidden') && tab === 'cursor') show('cursor'); } };
 })();

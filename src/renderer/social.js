@@ -139,6 +139,17 @@ const Social = (() => {
     } else if (r.kind === 'questReward') {
       top(`<div class="rw-ic">🧥</div><div><small>ÖZEL ÖDÜL KAZANDIN</small><b>${esc(r.item)}</b><span>${r.days} gün süreli · Envanterden tak</span></div>`);
       Sound.play('achievement');
+    } else if (r.kind === 'gwTask') {
+      top(`<div class="rw-ic">✅</div><div><small>${esc(r.head || 'GÖREV TAMAMLANDI')}</small><b>${esc(r.title)}</b><span>Çekiliş görevi</span></div>`);
+      Sound.play('notification');
+    } else if (r.kind === 'gwReady') {
+      top(`<div class="rw-ic">🎟️</div><div><small>ÇEKİLİŞE KATILABİLİRSİN</small><b>${esc(r.title)}</b><span>Görevler sayfasından katıl</span></div>`, () => go('quests'));
+      Sound.play('achievement');
+    } else if (r.kind === 'gwWon') {
+      top(`<div class="rw-ic">🏆</div><div><small>ÇEKİLİŞİ KAZANDIN!</small><b>${esc(r.title)}</b><span>Tebrikler! Ayrıntılar Görevler sayfasında</span></div>`, () => go('quests'));
+      Sound.play('achievement');
+    } else if (r.kind === 'gwLost') {
+      top(`<div class="rw-ic">🎁</div><div><small>ÇEKİLİŞ AÇIKLANDI</small><b>${esc(r.title)}</b><span>Sonucu görmek için tıkla</span></div>`, () => go('quests'));
     } else if (r.kind === 'hourly') {
       side(r.coins, r.lp, "Cubixora'da vakit geçirdin");
     } else if (r.kind === 'level') {
@@ -147,9 +158,10 @@ const Social = (() => {
     }
     sc('summary').then((s) => { S.me = s; renderWallet(); }).catch(() => {});
   }
-  function top(html) {
+  function top(html, onClick) {
     const el = document.createElement('div');
     el.className = 'rw-top'; el.innerHTML = html;
+    if (onClick) { el.classList.add('click'); el.onclick = () => { onClick(); el.classList.add('out'); }; }
     $('#rewardTop').appendChild(el);
     setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 500); }, 4200);
   }

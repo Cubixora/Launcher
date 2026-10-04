@@ -30,6 +30,7 @@ public final class CxClient {
         public int particles = 100;
         public boolean bgFpsLimit = false, skin3d = true, menuCentered = true;
         // nişangah
+        public String cursor = "";   // Cubixora imleci (boş = sistem imleci)
         public boolean crossOn = false, crossDot = false, crossOutline = true, crossT = false;
         public int crossColor = 0x00FF00, crossGap = 2, crossLength = 5, crossThick = 1, crossOutlineThick = 1;
         // sesli sohbet
@@ -83,6 +84,7 @@ public final class CxClient {
 
     private CxClient() {}
 
+    private static String launcherCursor;
     private static Path dir() { return FabricLoader.getInstance().getConfigDir().resolve("cubixora"); }
 
     @SuppressWarnings("deprecation")
@@ -95,6 +97,7 @@ public final class CxClient {
                 playerName = str(o, "name");
                 coins = o.has("coins") ? o.get("coins").getAsLong() : 0;
                 plus = o.has("plus") && o.get("plus").getAsBoolean();
+                launcherCursor = o.has("cursor") ? str(o, "cursor") : null;
                 if (o.has("bridge") && o.get("bridge").isJsonObject()) {
                     JsonObject b = o.getAsJsonObject("bridge");
                     bridgePort = b.has("port") ? b.get("port").getAsInt() : 0;
@@ -127,6 +130,8 @@ public final class CxClient {
             settings = new Settings();
         }
         if (settings.micMode < 0) settings.micMode = 0;
+        if (settings.cursor == null) settings.cursor = "";
+        if (launcherCursor != null) CxCursor.fromLauncher(launcherCursor);
         if (enabled) Cubixora.LOG.info("Cubixora Client etkin ({} arkadaş, {} haber)", FRIENDS.size(), NEWS.size());
         // açılış sesi hazırlığı (ses cihazını açmak ağır): animasyon başlamadan arka planda yapılır, açılışta sadece başlatılır
         if (enabled && settings.intro && settings.introSound) CxBootSound.prepare();

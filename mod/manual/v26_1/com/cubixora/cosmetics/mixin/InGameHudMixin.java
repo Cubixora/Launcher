@@ -15,4 +15,8 @@ public abstract class InGameHudMixin {
     private void cubixora$hud(GuiGraphicsExtractor context, DeltaTracker tickCounter, CallbackInfo ci) {
         CxHud.render(context);
     }
+
+    // Cubixora nişangahı açıksa oyunun kendi nişangahı çizilmez (Cubixora'nınki HUD'da çizilir)
+    @Inject(method = {"renderCrosshair", "extractCrosshair"}, at = @At("HEAD"), cancellable = true, require = 0)
+    private void cubixora$crosshair(CallbackInfo ci) { if (com.cubixora.client.CxCrosshair.active()) ci.cancel(); }
 }

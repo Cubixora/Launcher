@@ -31,6 +31,8 @@ Son sürümü sağdaki **[Releases](../../releases/latest)** bölümünden indir
 - Arkadaşlar, çevrimiçi durumu, özel ve grup sohbeti (görsel, sesli mesaj), sesli arama
 - Profil: çerçeve, renk paketi, banner, çok satırlı durum mesajı, başarımlar, etkinlik
 - Coin ve LP sistemi, seviye ödülleri, görev zincirleri, hediye kodları
+- Görevli çekilişler: launcher'da ve partner sunucularda geçirilen süre gibi koşullar, katılım, otomatik kura ve sonuç
+- 17 özgün fare imleci; launcher ve oyun arasında iki yönlü eşitlenir
 - Kozmetik mağazası: pelerin, kanat, omuz petleri, şapka, uçan pet, ateş efektleri, emote, sprey
 - WebGL ile çizilen 3D karakter / kozmetik önizlemesi
 - İmzalı güncelleme paketleri: yeni EXE gerekmeden anında güncelleme
@@ -42,6 +44,7 @@ Son sürümü sağdaki **[Releases](../../releases/latest)** bölümünden indir
 - Pelerin / kanat / pet / şapka / ateş efekti çizimi, emote çarkı, sprey
 - Sesli sohbet, oyuncu listesi, hata bildirimi
 - Sandıkta "Hepsini Al" / "Hepsini Koy" düğmeleri, Fullbright (Y), Zoom ve HUD modülleri
+- Özel nişangah (crosshair) editörü, oyun içi görev ve çekiliş bildirimleri
 - Desteklenen sürümler: 1.21.1, 1.21.4, 1.21.8, 1.21.11, 26.1
 
 ---

@@ -861,19 +861,33 @@ module.exports = function createSocial(ctx) {
   let qpTimer = null;
   async function questBump(stat, n = 1, absolute = false) {
     if (!me() || !cache.privates) return;
-    let cfg; try { cfg = await quests(); } catch { return; }
+    const [cfg, gws] = await Promise.all([quests().catch(() => null), giveaways().catch(() => [])]);
     const qp = cache.privates.qp = cache.privates.qp || {};
-    let changed = false;
-    for (const [eid, e] of Object.entries(cfg.events || {})) {
+    const gp = cache.privates.gp = cache.privates.gp || {};
+    const upd = (o) => { const prev = o[stat] || 0, next = absolute ? Math.max(prev, n) : prev + n; if (next === prev) return null; o[stat] = next; return [prev, next]; };
+    let changed = false, gwChanged = false;
+    for (const [eid, e] of Object.entries((cfg && cfg.events) || {})) {
       if (!eventLive(e) || !Object.values(e.steps || {}).some((s) => s.stat === stat)) continue;
-      const o = qp[eid] = qp[eid] || {};
-      const prev = o[stat] || 0, next = absolute ? Math.max(prev, n) : prev + n;
-      if (next !== prev) { o[stat] = next; changed = true; }
+      if (upd(qp[eid] = qp[eid] || {})) changed = true;
     }
-    if (!changed) return;
+    // çekiliş koşulları: ilerleme çekiliş açıkken sayılır; bir koşul bitince launcher'da ve oyunda bildirim çıkar
+    for (const g of gws) {
+      if (!gwOpen(g)) continue;
+      const conds = gwConds(g).filter((c) => c.stat === stat);
+      if (!conds.length) continue;
+      const o = gp[g.id] = gp[g.id] || {};
+      const wasReady = gwReady(g, gp);
+      const r = upd(o);
+      if (!r) continue;
+      gwChanged = true;
+      for (const c of conds) if (r[0] < c.goal && r[1] >= c.goal) gwToast('GÖREV TAMAMLANDI', c.title || STAT_TITLE(c.stat, c.goal));
+      if (!wasReady && gwReady(g, gp)) setTimeout(() => gwToast('ÇEKİLİŞE KATILABİLİRSİN', `${g.title}: Görevler sayfasından katıl`, 'gwReady'), 1200);
+    }
+    if (!changed && !gwChanged) return;
     clearTimeout(qpTimer);
-    qpTimer = setTimeout(() => db.patch(`privates/${me()}`, { qp }).catch(() => {}), 2500);
-    send('social:quest', {});
+    qpTimer = setTimeout(() => db.patch(`privates/${me()}`, { qp, gp }).catch(() => {}), 2500);
+    if (changed) send('social:quest', {});
+    if (gwChanged) send('social:giveaways', {});
   }
   async function claimDocs(keys) {
     const uid = me();
@@ -1172,6 +1186,185 @@ module.exports = function createSocial(ctx) {
 
   // ------------------------------------------------------------ yaşam döngüsü
   let hourTimer = null, beatTimer = null;
+
+  // ------------------------------------------------------------ çekilişler
+  // giveaways/{id}: admin oluşturur (koşullar, ödül, açıklanma zamanı). Katılım: giveaways/{id}/entries/{uid}.
+  // Kura admin'in launcher'ında yapılır (açıklanma zamanı gelince otomatik ya da "Şimdi çek" ile); açıklandıktan 1 gün sonra silinir.
+  const GW_KEEP = DAY;
+  const STAT_NAMES = {
+    launcher_minutes: (g) => `Launcher'da ${fmtMin(g)} geçir`, partner_minutes: (g) => `Partner sunucularda ${fmtMin(g)} oyna`,
+    minutes: (g) => `Oyunda ${fmtMin(g)} oyna`, launch: (g) => (g > 1 ? `Launcher'ı ${g} kez aç` : "Launcher'ı aç"),
+    game: (g) => (g > 1 ? `Oyunu ${g} kez başlat` : 'Oyunu Cubixora ile başlat'), partner: (g) => (g > 1 ? `Partner sunuculara ${g} kez katıl` : 'Bir partner sunucuya katıl'),
+    friends: (g) => `${g} arkadaşa ulaş`, messages: (g) => `${g} mesaj gönder`, level: (g) => `Seviye ${g}'e ulaş`, buy: (g) => `Mağazadan ${g} ürün al`,
+    mod: (g) => `${g} mod indir`, call: (g) => `${g} sesli arama yap`
+  };
+  function fmtMin(m) { m = Math.round(m); if (m < 60) return `${m} dakika`; const h = Math.floor(m / 60), r = m % 60; return r ? `${h} saat ${r} dakika` : `${h} saat`; }
+  const STAT_TITLE = (stat, goal) => (STAT_NAMES[stat] ? STAT_NAMES[stat](goal) : `${stat}: ${goal}`);
+  let gwCache = { at: 0, list: [] }, gwInflight = null;
+  async function giveaways(force) {
+    if (!force && gwCache.at && now() - gwCache.at < 60 * 1000) return gwCache.list;
+    if (gwInflight) return gwInflight;   // aynı anda gelen istekler tek sorguda birleşir
+    gwInflight = db.query('giveaways').then((list) => { gwCache = { at: now(), list }; return list; })
+      .catch((e) => { if (!gwCache.at) throw e; return gwCache.list; })
+      .finally(() => { gwInflight = null; });
+    return gwInflight;
+  }
+  const gwOpen = (g) => g && g.status !== 'drawn' && (!g.startsAt || now() >= g.startsAt) && now() < (g.drawAt || 0);
+  const gwVisible = (g) => g && !(g.drawnAt && now() > g.drawnAt + GW_KEEP);
+  const gwConds = (g) => Object.entries(g.conds || {}).sort((a, b) => (a[1].order || 99) - (b[1].order || 99))
+    .map(([id, c]) => ({ id, stat: String(c.stat || 'launch'), goal: Math.max(1, Number(c.goal) || 1), title: String(c.title || '') }));
+  const gwProg = (g, gp, c) => Math.min(c.goal, (((gp || {})[g.id] || {})[c.stat]) || 0);
+  const gwReady = (g, gp) => gwConds(g).every((c) => gwProg(g, gp, c) >= c.goal);
+  function gwToast(title, sub, kind = 'gwTask') {
+    send('social:reward', { kind, title: sub, head: title });
+    if (ctx.modToast) ctx.modToast(title, sub);
+  }
+  const myName = () => String((cache.profile && (cache.profile.displayName || cache.profile.handle)) || (acct() && acct().name) || 'Oyuncu').slice(0, 24);
+
+  async function giveawayView() {
+    const uid = me(); if (!uid) throw new Error('Çekilişler için giriş yapmalısın.');
+    const list = (await giveaways()).filter(gwVisible);
+    const gp = (cache.privates && cache.privates.gp) || {};
+    const mine = await db.batchGet(list.map((g) => `giveaways/${g.id}/entries/${uid}`)).catch(() => []);
+    const joined = new Set(mine.map((d) => String(d.path || '').split('/')[1]));
+    const out = list.map((g) => {
+      const conds = gwConds(g).map((c) => ({ title: c.title || STAT_TITLE(c.stat, c.goal), goal: c.goal, progress: gwProg(g, gp, c), stat: c.stat }));
+      const winners = Array.isArray(g.winners) ? g.winners : [];
+      return {
+        id: g.id, title: g.title || 'Çekiliş', desc: g.desc || '', prize: g.prize || '', image: g.image || '', drawAt: g.drawAt || 0, startsAt: g.startsAt || 0,
+        winnerCount: g.winnerCount || 1, entries: g.entries || 0, status: g.status === 'drawn' ? 'drawn' : gwOpen(g) ? 'open' : now() >= (g.drawAt || 0) ? 'pending' : 'soon',
+        drawnAt: g.drawnAt || 0, deleteAt: g.drawnAt ? g.drawnAt + GW_KEEP : 0, conds, ready: conds.every((c) => c.progress >= c.goal), joined: joined.has(g.id),
+        winners: winners.map((w) => String(w.name || 'Oyuncu')), won: winners.some((w) => w.uid === uid)
+      };
+    });
+    const rank = (g) => (g.status === 'open' ? 0 : g.status === 'pending' ? 1 : g.status === 'soon' ? 2 : 3);
+    out.sort((a, b) => rank(a) - rank(b) || a.drawAt - b.drawAt);
+    return { list: out, serverNow: now() };
+  }
+  async function joinGiveaway(gid) {
+    const uid = me(); if (!uid) throw new Error('Çekilişe katılmak için giriş yapmalısın.');
+    const g = (await giveaways(true)).find((x) => x.id === gid);
+    if (!g || !gwVisible(g)) throw new Error('Bu çekiliş artık yok.');
+    if (!gwOpen(g)) throw new Error(g.status === 'drawn' ? 'Bu çekiliş sonuçlandı.' : 'Bu çekilişe katılım kapandı.');
+    if (!gwReady(g, (cache.privates && cache.privates.gp) || {})) throw new Error('Önce çekilişin görevlerini tamamlamalısın.');
+    try {
+      await db.commit([
+        { set: `giveaways/${gid}/entries/${uid}`, data: { uid, name: myName() }, serverTime: ['at'], exists: false },
+        { set: `giveaways/${gid}`, data: {}, mask: [], exists: true, increments: { entries: 1 } }
+      ]);
+    } catch (e) {
+      if (/ALREADY_EXISTS|already exists/i.test(e.message)) return { ok: true, already: true };
+      throw new Error('Katılınamadı: ' + e.message);
+    }
+    g.entries = (g.entries || 0) + 1;
+    gwSeen()[gid] = { joined: 1 }; saveConfig();
+    return { ok: true };
+  }
+  const gwSeen = () => { const c = getConfig(); c.social = c.social || {}; return (c.social.gwSeen = c.social.gwSeen || {}); };
+
+  // --- admin
+  function cleanGiveaway(g) {
+    const title = String(g.title || '').trim().slice(0, 80);
+    if (!title) throw new Error('Çekilişe bir başlık yaz.');
+    const drawAt = Math.round(Number(g.drawAt) || 0);
+    if (!drawAt) throw new Error('Sonuçların açıklanacağı tarihi seç.');
+    const conds = {};
+    (Array.isArray(g.conds) ? g.conds : []).slice(0, 8).forEach((c, i) => {
+      if (!STAT_NAMES[c.stat]) return;
+      conds['c' + (i + 1)] = { stat: c.stat, goal: Math.max(1, Math.min(100000, Math.round(Number(c.goal) || 1))), title: String(c.title || '').trim().slice(0, 80), order: i + 1 };
+    });
+    const image = /^data:image\/(jpeg|png|webp);base64,/.test(String(g.image || '')) && String(g.image).length < 160000 ? g.image : '';
+    return { title, desc: String(g.desc || '').trim().slice(0, 600), prize: String(g.prize || '').trim().slice(0, 120), image, drawAt,
+      startsAt: Math.round(Number(g.startsAt) || 0), winnerCount: Math.max(1, Math.min(50, Math.round(Number(g.winnerCount) || 1))), conds };
+  }
+  async function adminGiveaways() { needAdmin(); return (await giveaways(true)).map((g) => ({ ...g, conds: gwConds(g) })).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)); }
+  async function adminGiveawaySave(g) {
+    needAdmin();
+    const data = cleanGiveaway(g || {});
+    if (g && g.id) {
+      const cur = (await giveaways(true)).find((x) => x.id === g.id);
+      if (!cur) throw new Error('Çekiliş bulunamadı.');
+      if (cur.status === 'drawn') throw new Error('Sonuçlanan çekiliş düzenlenemez.');
+      await db.patch(`giveaways/${g.id}`, data);
+    } else {
+      if (data.drawAt <= now() + 60 * 1000) throw new Error('Açıklanma zamanı ileri bir tarih olmalı.');
+      await db.commit([{ set: `giveaways/g${crypto.randomBytes(6).toString('hex')}`, data: { ...data, status: 'open', entries: 0, winners: [], createdAt: now() }, exists: false }]);
+    }
+    gwCache.at = 0;
+    return adminGiveaways();
+  }
+  async function gwEntries(gid) {
+    const out = [];
+    let pageToken = '';
+    do {   // sayfa sayfa: kalabalık çekilişlerde de hepsi gelir
+      const j = await db.listPage(`giveaways/${gid}/entries`, { pageSize: 300, pageToken });
+      out.push(...j.docs); pageToken = j.next || '';
+    } while (pageToken && out.length < 20000);
+    return out;
+  }
+  async function adminGiveawayEntries(gid) {
+    needAdmin();
+    const list = await gwEntries(gid);
+    const emails = await db.batchGet(list.map((e) => `emails/${e.id}`)).catch(() => []);
+    const em = Object.fromEntries(emails.map((d) => [d.id, d.email || '']));
+    return list.map((e) => ({ uid: e.id, name: e.name || '', email: em[e.id] || '', at: e.at || e._updated }))
+      .sort((a, b) => a.at - b.at);
+  }
+  async function adminGiveawayDraw(gid) {
+    needAdmin();
+    const g = (await giveaways(true)).find((x) => x.id === gid);
+    if (!g) throw new Error('Çekiliş bulunamadı.');
+    if (g.status === 'drawn') throw new Error('Bu çekiliş zaten sonuçlandı.');
+    const pool = await gwEntries(gid);
+    const k = Math.min(pool.length, g.winnerCount || 1);
+    for (let i = pool.length - 1; i > 0; i--) { const j = crypto.randomInt(i + 1); [pool[i], pool[j]] = [pool[j], pool[i]]; }   // adil karıştırma
+    const winners = pool.slice(0, k).map((e) => ({ uid: e.id, name: String(e.name || 'Oyuncu').slice(0, 24) }));
+    await db.patch(`giveaways/${gid}`, { status: 'drawn', winners, drawnAt: now() });
+    for (const w of winners) adminNotify({ to: w.uid, title: '🎉 Çekilişi kazandın!', text: `"${g.title}" çekilişini kazandın${g.prize ? `: ${g.prize}` : ''}. Ayrıntılar Görevler > Çekilişler'de.`, level: 'success' }).catch(() => {});
+    gwCache.at = 0;
+    return { winners };
+  }
+  async function adminGiveawayDelete(gid) {
+    needAdmin();
+    const ents = await gwEntries(gid).catch(() => []);
+    for (let i = 0; i < ents.length; i += 400) await db.commit(ents.slice(i, i + 400).map((e) => ({ delete: `giveaways/${gid}/entries/${e.id}` })));
+    await db.del(`giveaways/${gid}`);
+    gwCache.list = gwCache.list.filter((x) => x.id !== gid);
+    return true;
+  }
+  // her dakika: sonuçlanan çekilişleri oyuncuya bildirir; admin ise zamanı gelen kurayı çeker ve süresi dolanı siler
+  let gwBusy = false;
+  async function gwTick() {
+    if (!me() || gwBusy) return;
+    gwBusy = true;
+    try {
+      const before = JSON.stringify(gwCache.list.map((g) => [g.id, g.status, g.entries]));
+      const list = await giveaways(true);
+      if (isAdmin()) {
+        for (const g of list) {
+          if (g.status !== 'drawn' && g.drawAt && now() >= g.drawAt) await adminGiveawayDraw(g.id).catch((e) => log(`[çekiliş] kura: ${e.message}`));
+          else if (g.drawnAt && now() > g.drawnAt + GW_KEEP) await adminGiveawayDelete(g.id).catch((e) => log(`[çekiliş] silme: ${e.message}`));
+        }
+      }
+      const seen = gwSeen(); let dirty = false;
+      for (const g of list) {
+        const s = seen[g.id];
+        if (!s || !s.joined || s.result || g.status !== 'drawn') continue;
+        const won = (g.winners || []).some((w) => w.uid === me());
+        s.result = won ? 'won' : 'lost'; dirty = true;
+        if (won) gwToast('ÇEKİLİŞİ KAZANDIN! 🎉', g.prize ? `${g.title}: ${g.prize}` : g.title, 'gwWon');
+        else send('social:reward', { kind: 'gwLost', title: g.title, head: 'ÇEKİLİŞ AÇIKLANDI' });
+      }
+      for (const id of Object.keys(seen)) if (!list.some((g) => g.id === id)) { delete seen[id]; dirty = true; }
+      if (dirty) saveConfig();
+      if (JSON.stringify(gwCache.list.map((g) => [g.id, g.status, g.entries])) !== before) send('social:giveaways', {});
+    } catch (e) { log(`[çekiliş] ${e.message}`); }
+    finally { gwBusy = false; }
+  }
+  // Launcher'da geçen süre (çekiliş/görev koşulu): pencere açık olsun olmasın, launcher çalıştıkça dakikada 1
+  let minuteTimer = null;
+  function minuteTick() { questBump('launcher_minutes', 1); }
+
   async function start() {
     if (!me()) return null;
     await checkBan();
@@ -1184,7 +1377,9 @@ module.exports = function createSocial(ctx) {
     listenPresence();
     clearInterval(sweepTimer); sweepTimer = setInterval(sweep, 20 * 1000);
     clearInterval(hourTimer); hourTimer = setInterval(hourly, 5 * 60 * 1000);
+    clearInterval(minuteTimer); minuteTimer = setInterval(() => { minuteTick(); gwTick(); }, 60 * 1000);
     setTimeout(hourly, 20000);
+    setTimeout(gwTick, 8000);
     claimAchievement('first_launch').catch(() => {});
     questBump('launch', 1);
     friends().catch(() => {});
@@ -1193,7 +1388,7 @@ module.exports = function createSocial(ctx) {
   function stop() {
     if (stopListen) stopListen(); stopListen = null;
     if (stopPresence) stopPresence(); stopPresence = null;
-    clearInterval(beatTimer); clearInterval(hourTimer); clearInterval(sweepTimer);
+    clearInterval(beatTimer); clearInterval(hourTimer); clearInterval(sweepTimer); clearInterval(minuteTimer);
     const uid = me();
     const off = uid ? db.rtSet(`presence/${uid}`, { s: 'offline', t: { '.sv': 'timestamp' }, g: '' }).catch(() => {}) : Promise.resolve();
     cache.profile = cache.wallet = cache.inventory = cache.privates = null; claimed = null;
@@ -1210,6 +1405,7 @@ module.exports = function createSocial(ctx) {
     submitReport, adminReports, adminDeleteReport, adminGet, adminSet, adminNotify, adminDeleteNotification, adminUser, adminGrant, adminRevoke, adminBan, adminBannedEmails, adminBanEmail, adminUnbanEmail, adminDeleteUser, adminSetRoles, hasPlusPerk,
     adminCodes, adminSaveCode, adminDeleteCode, adminBetaKeys, adminSaveBetaKey, adminDeleteBetaKey, adminPublish,
     levelOf, lpFor, inventory: myInv, timedLive, timedAll: () => ({ ...timedCache }),
-    news, adminNewsList, adminNewsSave, adminNewsDelete, questView, claimQuestStep, claimQuestReward, levelView, claimLevel, quests
+    news, adminNewsList, adminNewsSave, adminNewsDelete, questView, claimQuestStep, claimQuestReward, levelView, claimLevel, quests,
+    giveawayView, joinGiveaway, adminGiveaways, adminGiveawaySave, adminGiveawayEntries, adminGiveawayDraw, adminGiveawayDelete, partnerMinute: () => questBump('partner_minutes', 1)
   };
 };

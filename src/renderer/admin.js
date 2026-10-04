@@ -209,7 +209,7 @@ const Admin = (() => {
       const rewardItems = Object.entries(shopCfg.items || {}).filter(([, it]) => ['cape', 'wings', 'emote', 'spray'].includes(it.type));
       const STATS = [['launch', "Launcher'a gir"], ['game', 'Oyunu Cubixora ile başlat'], ['minutes', 'Oyunda dakika geçir'], ['mod', 'Mod indir'], ['resourcepack', 'Doku paketi indir'], ['shader', 'Shader indir'],
         ['partner', 'Partner sunucuya katıl'], ['search', 'İçerik ara'], ['call', 'Sesli arama yap'], ['group_join', 'Gruba katıl'], ['share', 'Paylaşım yap'], ['friends', 'Arkadaş sayısına ulaş'],
-        ['messages', 'Mesaj gönder'], ['buy', 'Mağazadan satın al'], ['level', 'Seviyeye ulaş']];
+        ['messages', 'Mesaj gönder'], ['buy', 'Mağazadan satın al'], ['level', 'Seviyeye ulaş'], ['launcher_minutes', "Launcher'da dakika geçir"], ['partner_minutes', 'Partner sunucularda dakika oyna']];
       const rid = (p) => p + Math.random().toString(16).slice(2, 8);
       let events = Object.entries(d.events || {}).sort((a, b) => (a[1].order || 99) - (b[1].order || 99)).map(([id, e]) => ({ id, ...e, steps: Object.entries(e.steps || {}).sort((a, b) => (a[1].order || 99) - (b[1].order || 99)).map(([sid, s]) => ({ id: sid, ...s })) }));
       const toLocal = (t) => (t ? new Date(t - new Date(t).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '');
@@ -258,6 +258,90 @@ const Admin = (() => {
           }
           try { await sc('adminSet', 'quests', { events: out }); toast('Görevler kaydedildi. Tüm oyunculara gitti.', 'success'); } catch (e) { toast(e.message, 'error'); }
         };
+      };
+      render();
+    },
+
+    // ---------------------------------------------------------- çekilişler
+    async giveaways() {
+      const GSTATS = [['launcher_minutes', "Launcher'da dakika geçir"], ['partner_minutes', 'Partner sunucularda dakika oyna'], ['minutes', 'Oyunda dakika oyna'],
+        ['launch', "Launcher'ı aç"], ['game', 'Oyunu Cubixora ile başlat'], ['partner', 'Partner sunucuya katıl'], ['friends', 'Arkadaş sayısına ulaş'],
+        ['messages', 'Mesaj gönder'], ['level', 'Seviyeye ulaş'], ['buy', 'Mağazadan ürün al'], ['mod', 'Mod indir'], ['call', 'Sesli arama yap']];
+      const toLocal = (t) => (t ? new Date(t - new Date(t).getTimezoneOffset() * 60000).toISOString().slice(0, 16) : '');
+      const fromLocal = (v) => (v ? new Date(v).getTime() : 0);
+      const fmt = (t) => (t ? new Date(t).toLocaleString('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
+      let list = await sc('adminGiveaways');
+      let form = null;   // düzenlenen / yeni çekiliş
+      const open = new Set();
+      const blank = () => ({ title: '', desc: '', prize: '', image: '', winnerCount: 1, startsAt: 0, drawAt: Date.now() + 7 * 864e5, conds: [{ stat: 'launcher_minutes', goal: 60, title: '' }, { stat: 'partner_minutes', goal: 15, title: '' }] });
+      const stLabel = (g) => (g.status === 'drawn' ? `Açıklandı · ${(g.winners || []).length} kazanan` : Date.now() >= g.drawAt ? 'Kura bekliyor' : 'Aktif');
+      const formHtml = (f) => `<div class="ad-card"><b>${f.id ? 'Çekilişi düzenle' : 'Yeni çekiliş'}</b>
+        <div class="ad-fields wide" id="gwF">
+          ${field('Başlık', inp('title', f.title, 'Ekim Çekilişi'))}${field('Ödül', inp('prize', f.prize, 'Cubixora+ 1 ay / 500 coin / VIP'))}
+          ${field('Açıklama', inp('desc', f.desc, 'Kısa açıklama'))}${field('Kazanan sayısı', inp('winnerCount', f.winnerCount, '1', 'number'))}
+          ${field('Başlangıç (boş = hemen)', `<input class="input" type="datetime-local" data-k="startsAt" value="${toLocal(f.startsAt)}" />`)}
+          ${field('Sonuçların açıklanacağı zaman', `<input class="input" type="datetime-local" data-k="drawAt" value="${toLocal(f.drawAt)}" />`)}
+        </div>
+        <div class="gw-ad-img" id="gwImg" style="${f.image ? `background-image:url('${f.image}')` : ''}">${f.image ? '' : 'Görsel seç (isteğe bağlı) · 800×250'}</div>
+        <div class="gw-ad-conds"><b>Katılma koşulları (görevler)</b><small class="muted">Süre koşullarında hedef <b>dakika</b> cinsindendir (1 saat = 60). İlerleme çekiliş başladıktan sonra sayılır. Başlık boşsa otomatik yazılır.</small>
+          ${f.conds.map((c, j) => `<div class="gw-ad-cond" data-j="${j}">${sel('stat', c.stat, GSTATS)}${inp('goal', c.goal, 'Hedef', 'number')}${inp('title', c.title, 'Başlık (isteğe bağlı)')}<button class="icon-btn tiny danger" data-cdel>✕</button></div>`).join('')}
+          <button class="btn btn-ghost tiny" id="gwCAdd">+ Koşul ekle</button></div>
+        <div class="ad-save"><button class="btn btn-ghost" id="gwCancel">Vazgeç</button><button class="btn btn-primary" id="gwSave">${f.id ? 'Kaydet' : 'Çekilişi başlat'}</button></div></div>`;
+      const syncForm = () => {
+        if (!form) return;
+        const top = readCard($('#gwF'));
+        form = { ...form, ...top, startsAt: fromLocal(top.startsAt), drawAt: fromLocal(top.drawAt), conds: $$('.gw-ad-cond', box()).map((el) => readCard(el)) };
+      };
+      const entriesHtml = (g, rows) => {
+        const win = new Set((g.winners || []).map((w) => w.uid));
+        return `<div class="gw-ad-ents"><table><thead><tr><th>#</th><th>OYUNCU</th><th>E-POSTA</th><th>KATILMA</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td>${i + 1}</td><td class="${win.has(r.uid) ? 'win' : ''}">${win.has(r.uid) ? '🏆 ' : ''}${esc(r.name)}</td><td>${esc(r.email || '—')}</td><td>${fmt(r.at)}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">Henüz katılan yok.</td></tr>'}</tbody></table></div>`;
+      };
+      const render = () => {
+        box().innerHTML = `<p class="ad-p">Çekiliş aç, katılma koşullarını (görevleri) belirle. Oyuncular görevleri bitirince <b>Görevler</b> sayfasından katılır; görev tamamlanınca launcher'da ve oyunda bildirim çıkar. Açıklanma zamanı gelince kura <b>bu launcher açıksa otomatik</b> çekilir (istersen "Şimdi çek"). Kazananlara bildirim gider; çekiliş açıklandıktan 1 gün sonra kendiliğinden silinir.</p>
+          ${form ? formHtml(form) : '<button class="btn btn-primary" id="gwNew">+ Yeni çekiliş</button>'}
+          <div class="gw-ad-list" style="margin-top:14px">${list.map((g) => `<div class="gw-ad-row" data-id="${esc(g.id)}">
+            <div><b>${esc(g.title)}</b><small>${stLabel(g)} · ${g.entries || 0} katılımcı · ${g.winnerCount || 1} kazanan · açıklanma: ${fmt(g.drawAt)}${g.prize ? ` · ödül: ${esc(g.prize)}` : ''}</small>
+              ${g.status === 'drawn' && (g.winners || []).length ? `<small>Kazanan: <b>${g.winners.map((w) => esc(w.name)).join(', ')}</b></small>` : ''}</div>
+            <div class="gw-ad-btns"><button class="btn btn-ghost tiny" data-ents>${open.has(g.id) ? 'Gizle' : 'Katılımcılar'}</button>
+              ${g.status !== 'drawn' ? '<button class="btn btn-ghost tiny" data-edit>Düzenle</button><button class="btn btn-ghost tiny" data-draw>Şimdi çek</button>' : ''}
+              <button class="btn btn-ghost tiny danger" data-del>Sil</button></div>
+            ${open.has(g.id) ? '<div class="gw-ad-ents" data-slot><div class="skeleton" style="height:60px"></div></div>' : ''}</div>`).join('') || '<div class="s-empty">Şu an çekiliş yok.</div>'}</div>`;
+        if (!form) $('#gwNew').onclick = () => { form = blank(); render(); };
+        else {
+          $('#gwCancel').onclick = () => { form = null; render(); };
+          $('#gwCAdd').onclick = () => { syncForm(); if (form.conds.length >= 8) return toast('En fazla 8 koşul.', 'error'); form.conds.push({ stat: 'launch', goal: 1, title: '' }); render(); };
+          $$('[data-cdel]', box()).forEach((b) => (b.onclick = () => { syncForm(); form.conds.splice(Number(b.closest('.gw-ad-cond').dataset.j), 1); render(); }));
+          $('#gwImg').onclick = async () => { syncForm(); const img = await pickBanner(); if (img) { form.image = img; render(); } };
+          $('#gwSave').onclick = async (e) => {
+            syncForm();
+            if (!form.title.trim()) return toast('Başlık yaz.', 'error');
+            if (!form.drawAt || form.drawAt < Date.now() + 60000) return toast('Açıklanma zamanı ileri bir tarih olmalı.', 'error');
+            e.target.disabled = true;
+            try { list = await sc('adminGiveawaySave', form); form = null; toast('Çekiliş kaydedildi, herkese gitti.', 'success'); render(); }
+            catch (err) { toast(err.message, 'error'); e.target.disabled = false; }
+          };
+        }
+        $$('.gw-ad-row', box()).forEach((row) => {
+          const id = row.dataset.id, g = list.find((x) => x.id === id);
+          $('[data-ents]', row).onclick = () => { if (open.has(id)) open.delete(id); else open.add(id); render(); };
+          const ed = $('[data-edit]', row); if (ed) ed.onclick = () => { form = { ...g, conds: (g.conds || []).map((c) => ({ stat: c.stat, goal: c.goal, title: c.title })) }; render(); box().scrollTop = 0; };
+          const dr = $('[data-draw]', row);
+          if (dr) dr.onclick = async () => {
+            if (!(await confirmBox('Kura şimdi çekilsin mi?', `"${g.title}" için ${g.winnerCount || 1} kazanan rastgele seçilir ve çekiliş kapanır.`, 'Çek'))) return;
+            dr.disabled = true;
+            try { const r = await sc('adminGiveawayDraw', id); toast(r.winners.length ? `Kazanan: ${r.winners.map((w) => w.name).join(', ')}` : 'Katılımcı yoktu, kazanan çıkmadı.', 'success'); list = await sc('adminGiveaways'); open.add(id); render(); }
+            catch (err) { toast(err.message, 'error'); dr.disabled = false; }
+          };
+          $('[data-del]', row).onclick = async () => {
+            if (!(await confirmBox('Çekiliş silinsin mi?', 'Çekiliş ve tüm katılımlar kalıcı olarak silinir.', 'Sil'))) return;
+            try { await sc('adminGiveawayDelete', id); list = list.filter((x) => x.id !== id); open.delete(id); toast('Çekiliş silindi.', 'success'); render(); } catch (err) { toast(err.message, 'error'); }
+          };
+          const slot = $('[data-slot]', row);
+          if (slot) sc('adminGiveawayEntries', id).then((rows) => {
+            slot.outerHTML = entriesHtml(g, rows) + (rows.length ? `<div class="gw-ad-btns" style="grid-column:1/-1;justify-content:flex-start"><button class="btn btn-ghost tiny" data-copy>E-postaları kopyala (${rows.filter((r) => r.email).length})</button></div>` : '');
+            const cp = $('[data-copy]', row); if (cp) cp.onclick = () => { navigator.clipboard.writeText(rows.map((r) => r.email).filter(Boolean).join('\n')).then(() => toast('Kopyalandı.', 'success')).catch(() => {}); };
+          }).catch((err) => { slot.innerHTML = `<p class="muted" style="padding:10px">${esc(err.message)}</p>`; });
+        });
       };
       render();
     },

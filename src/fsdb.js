@@ -72,6 +72,11 @@ module.exports = function createDb({ projectId, apiKey, token, rtdbUrl }) {
     const j = await call('GET', `${BASE()}/${col}?pageSize=${pageSize}${orderBy ? `&orderBy=${encodeURIComponent(orderBy)}` : ''}`);
     return (j.documents || []).map(decDoc);
   }
+  // tek sayfa + sonraki sayfanın anahtarı (alt koleksiyonlarda da çalışır)
+  async function listPage(col, { pageSize = 300, pageToken = '' } = {}) {
+    const j = await call('GET', `${BASE()}/${col}?pageSize=${pageSize}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`);
+    return { docs: (j.documents || []).map(decDoc), next: j.nextPageToken || '' };
+  }
   async function batchGet(paths) {
     if (!paths.length) return [];
     const out = [];
@@ -169,6 +174,6 @@ module.exports = function createDb({ projectId, apiKey, token, rtdbUrl }) {
     return () => { stopped = true; if (ctrl) ctrl.abort(); };
   }
 
-  return { get, set, patch, del, create, add, list, batchGet, query, commit, enc, dec, ts: (ms) => ({ __ts: ms }),
+  return { get, set, patch, del, create, add, list, listPage, batchGet, query, commit, enc, dec, ts: (ms) => ({ __ts: ms }),
     rtGet, rtSet, rtPush, rtPatch, rtDel, rtListen };
 };

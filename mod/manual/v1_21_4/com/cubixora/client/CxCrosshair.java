@@ -36,6 +36,8 @@ public final class CxCrosshair {
         c.fill(x, y, x + w, y + h, col);
     }
 
+    public static boolean active() { return CxClient.enabled && CxClient.settings != null && CxClient.settings.crossOn; }
+
     public static String code(CxClient.Settings st) {
         int c = st.crossColor & 0xFFFFFF;
         return ((c >> 16) & 255) + "," + ((c >> 8) & 255) + "," + (c & 255) + "," + st.crossGap + "," + st.crossLength + "," + st.crossThick + ","
