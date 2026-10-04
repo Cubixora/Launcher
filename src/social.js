@@ -1057,12 +1057,12 @@ module.exports = function createSocial(ctx) {
   async function adminDeleteReport(id) { needAdmin(); await db.del(`reports/${String(id).replace(/[^a-z0-9]/gi, '')}`); return true; }
   // ------------------------------------------------------------ Firebase -> Supabase taşıma (bir kez, admin)
   // Hesaplar eski kimlikleriyle taşındığı için (app_metadata.fbuid) tüm belgeler olduğu gibi kopyalanır.
-  async function adminMigrate({ password } = {}) {
+  async function adminMigrate({ googleIdToken } = {}) {
     needAdmin();
     const lf = legacy();
     if (!lf) throw new Error('cloud.json içinde firebaseLegacy ayarı yok.');
-    if (!password) throw new Error('Firebase admin şifreni yaz (eski hesabının şifresi).');
-    await lf.signIn(ADMIN_EMAIL, password);
+    if (!googleIdToken) throw new Error('Önce eski Firebase hesabına Google ile bağlan.');
+    await lf.signIn(googleIdToken);
     const fdb = lf.db;
     const TOP = ['config', 'news', 'notifications', 'giftCodes', 'betaKeys', 'users', 'emails', 'bannedEmails', 'usernames', 'handles', 'cosmetics',
       'profiles', 'giveaways', 'privates', 'wallets', 'inventory', 'friendRequests', 'friendships', 'chats', 'groups', 'reports'];
@@ -1237,7 +1237,7 @@ module.exports = function createSocial(ctx) {
 
   // güncelleme yayınla: klasördeki launcher kodunu paketler, gizli anahtarla imzalar
   // Güncelleme yayınla: paket imzalanır, GitHub Releases'a ("app-bundle" sürümü) yüklenir, sürüm bilgisi Supabase config/app'e yazılır.
-  // legacyPassword verilirse paket ayrıca eski (Firebase'li) launcher'lara da gönderilir (geçiş için, bir kez).
+  // legacyGoogleToken verilirse paket ayrıca eski (Firebase'li) launcher'lara da gönderilir (geçiş için, bir kez).
   const GH_REPO = 'Cubixora/Launcher', GH_TAG = 'app-bundle';
   async function ghCall(token, method, url, body, headers = {}) {
     const r = await fetch(url.startsWith('http') ? url : `https://api.github.com${url}`, {
@@ -1248,7 +1248,7 @@ module.exports = function createSocial(ctx) {
     if (!r.ok) throw new Error(r.status === 401 ? 'GitHub anahtarı geçersiz ya da süresi dolmuş.' : r.status === 403 ? 'GitHub anahtarının bu depoya yazma izni yok (Contents: Read and write).' : `GitHub hatası: ${j.message || r.status}`);
     return j;
   }
-  async function adminPublish({ dir, keyFile, notes, ghToken, legacyPassword }) {
+  async function adminPublish({ dir, keyFile, notes, ghToken, legacyGoogleToken }) {
     needAdmin();
     const { createZip, collect } = require('./ziputil');
     if (!fs.existsSync(path.join(dir, 'main.js')) || !fs.existsSync(path.join(dir, 'renderer'))) throw new Error('Seçilen klasör launcher\'ın "src" klasörü değil.');
@@ -1257,7 +1257,7 @@ module.exports = function createSocial(ctx) {
     const token = String(ghToken || '').trim() || (c.adminPublish && c.adminPublish.gh ? unprotect(c.adminPublish.gh) : '');
     if (!token) throw new Error('GitHub anahtarını yaz (bir kez yazman yeterli, sonra hatırlanır).');
     let lf = null;
-    if (legacyPassword) { lf = legacy(); if (!lf) throw new Error('cloud.json içinde firebaseLegacy ayarı yok.'); await lf.signIn(ADMIN_EMAIL, legacyPassword); }
+    if (legacyGoogleToken) { lf = legacy(); if (!lf) throw new Error('cloud.json içinde firebaseLegacy ayarı yok.'); await lf.signIn(legacyGoogleToken); }
     const cur = await db.get('config/app', false);
     const old = lf ? await lf.db.get('config/app', false).catch(() => null) : null;
     const build = Math.max((cur && cur.build) || 0, (old && old.build) || 0, (global.__cubixora && global.__cubixora.build) || 0) + 1;

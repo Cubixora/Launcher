@@ -464,7 +464,7 @@ function waitForOAuthCode(expectedState) {
   });
 }
 
-async function loginSocial(provider) {
+async function loginSocial(provider, { tokenOnly } = {}) {
   const P = PROVIDERS[provider];
   if (!P) throw new Error('Bilinmeyen giriş yöntemi.');
   const c = oauthConfig(provider);
@@ -489,6 +489,7 @@ async function loginSocial(provider) {
   const tok = await tr.json().catch(() => ({}));
   if (!tr.ok || !tok.access_token) throw new Error(`${P.label} girişi tamamlanamadı: ${tok.error_description || tok.error || tr.status}`);
   if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.focus(); }
+  if (tokenOnly) { if (!tok.id_token) throw new Error('Google kimlik bilgisi alınamadı.'); return tok.id_token; }
   if (cloud.enabled() && provider === 'google') {
     if (!tok.id_token) throw new Error('Google kimlik bilgisi alınamadı.');
     return activateAccount(await cloud.loginGoogle(tok.id_token));
@@ -1926,6 +1927,8 @@ handle('admin:previewStart', async (mode) => {
   send('preview:state', { running: true });
   return true;
 });
+// GEÇİCİ (Firebase'den geçiş): admin eski Firebase hesabına Google ile bağlanır
+handle('admin:googleToken', async () => loginSocial('google', { tokenOnly: true }));
 handle('admin:publishInfo', async () => {
   const d = path.join(app.getPath('desktop'), 'cubixora-launcher');
   const c = config.adminPublish || {};

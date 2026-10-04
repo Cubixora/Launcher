@@ -6,12 +6,15 @@
 module.exports = function legacyFirebase(conf) {
   if (!conf || !conf.apiKey || !conf.projectId) return null;
   let idToken = null;
-  async function signIn(email, password) {
-    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${encodeURIComponent(conf.apiKey)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password, returnSecureToken: true })
+  // admin hesabı Google ile açılmış: Google kimlik anahtarıyla eski Firebase oturumu alınır
+  async function signIn(googleIdToken) {
+    const r = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${encodeURIComponent(conf.apiKey)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postBody: `id_token=${encodeURIComponent(googleIdToken)}&providerId=google.com`, requestUri: 'http://localhost', returnSecureToken: true })
     });
     const j = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(/INVALID|PASSWORD|EMAIL_NOT_FOUND/.test((j.error && j.error.message) || '') ? 'Firebase şifresi hatalı.' : `Firebase girişi olmadı: ${(j.error && j.error.message) || r.status}`);
+    if (!r.ok) throw new Error(`Firebase girişi olmadı: ${(j.error && j.error.message) || r.status}`);
+    if (String(j.email || '').toLowerCase() !== 'cubixora@gmail.com') throw new Error('Firebase\'e admin hesabıyla (cubixora@gmail.com) girmelisin.');
     idToken = j.idToken;
     return true;
   }

@@ -74,6 +74,7 @@ contextBridge.exposeInMainWorld('cx', {
   autologinList: () => invoke('settings:autologinList'),
   callHotkeys: (on) => invoke('call:hotkeys', on),
   publishInfo: () => invoke('admin:publishInfo'),
+  adminGoogleToken: () => invoke('admin:googleToken'),
   previewInfo: () => invoke('app:previewInfo'),
   previewExit: () => invoke('preview:exit'),
   previewStart: (mode) => invoke('admin:previewStart', mode),
