@@ -43,7 +43,7 @@ public final class CxEmoteNet {
     public static void tick(Minecraft mc) {
         if (mc.level == null || mc.player == null) return;
         long now = System.currentTimeMillis();
-        if (now >= nextPoll && !inFlight) { nextPoll = now + 1100; poll(mc, now); }
+        if (now >= nextPoll && !inFlight) { nextPoll = now + 3000; poll(mc, now); }
         if (CxEmoteAnim.any() && (++tickN & 1) == 0) hearts(mc);
         // ateş efekti oyuncu katmanında çiziliyor (CxFlames); burada tik başına iş yok
     }

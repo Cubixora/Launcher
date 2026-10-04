@@ -32,7 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class CosmeticsManager {
     private static final long REFRESH_MS = 5 * 60 * 1000L;
-    private static final long MISS_RETRY_MS = 10 * 60 * 1000L;
+    private static final long MISS_RETRY_MS = 60 * 60 * 1000L;
 
     private static final Map<String, PlayerCosmetics> CACHE = new ConcurrentHashMap<>();
     private static final Map<String, Long> MISSES = new ConcurrentHashMap<>();
