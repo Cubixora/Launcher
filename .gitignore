@@ -7,6 +7,9 @@
 !/package.json
 !/src/
 !/mod/
+!/supabase/
+/supabase/*
+!/supabase/cubixora.sql
 
 # --- GİZLİ: asla GitHub'a gitmesin
 src/oauth.json

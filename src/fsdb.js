@@ -105,6 +105,14 @@ module.exports = function createDb({ projectId, apiKey, token, rtdbUrl }) {
     return (Array.isArray(j) ? j : []).filter((x) => x.document).map((x) => decDoc(x.document));
   }
 
+  // tüm alt koleksiyonlarda aynı adlı koleksiyon (ör. "items"): yol sırasıyla sayfa sayfa (taşıma için)
+  async function queryGroup(collectionId, { pageSize = 300, after = '' } = {}) {
+    const sq = { from: [{ collectionId, allDescendants: true }], orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }], limit: pageSize };
+    if (after) sq.startAt = { values: [{ referenceValue: NAME(after) }], before: false };
+    const j = await call('POST', `${BASE()}:runQuery`, { structuredQuery: sq });
+    return (Array.isArray(j) ? j : []).filter((x) => x.document).map((x) => decDoc(x.document));
+  }
+
   // writes: [{ set: path, data, mask? , exists? }, { delete: path }, { transform: path, increments: {field: n}, serverTime: [fields] }]
   async function commit(writes) {
     const body = {
@@ -174,6 +182,6 @@ module.exports = function createDb({ projectId, apiKey, token, rtdbUrl }) {
     return () => { stopped = true; if (ctrl) ctrl.abort(); };
   }
 
-  return { get, set, patch, del, create, add, list, listPage, batchGet, query, commit, enc, dec, ts: (ms) => ({ __ts: ms }),
+  return { kind: 'firestore', get, set, patch, del, create, add, list, listPage, batchGet, query, queryGroup, commit, enc, dec, ts: (ms) => ({ __ts: ms }),
     rtGet, rtSet, rtPush, rtPatch, rtDel, rtListen };
 };

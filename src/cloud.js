@@ -103,10 +103,25 @@ module.exports = function createCloud(ctx) {
     }
     return j;
   }
-  const getDoc = async (p, auth = true) => { const j = await fsCall('GET', `${FS_BASE()}/${p}`, null, auth); return j.notFound ? null : fromFields(j.fields); };
-  const setDoc = (p, obj) => fsCall('PATCH', `${FS_BASE()}/${p}`, { fields: toFields(obj) });
-  const delDoc = (p) => fsCall('DELETE', `${FS_BASE()}/${p}`);
+  // ------------------------------------------------------------ Supabase (cloud.json'da supabaseUrl + supabaseKey varsa)
+  // Giriş yine Firebase ile; veriler ve anlık kanallar Supabase'de. Tek bağlantı launcher'ın her yerinde paylaşılır.
+  let sbInst = null;
+  const sb = () => {
+    const c = cfg();
+    if (!c.supabaseUrl || !c.supabaseKey) return null;
+    if (!sbInst) sbInst = require('./sbdb')({ url: c.supabaseUrl, key: c.supabaseKey, token: () => token(), log });
+    return sbInst;
+  };
+  const plain = (d) => { if (!d) return null; const { id, path: _p, _updated, ...rest } = d; void id; void _p; void _updated; return rest; };
+
+  const getDoc = async (p, auth = true) => {
+    if (sb()) return plain(await sb().get(p, auth));
+    const j = await fsCall('GET', `${FS_BASE()}/${p}`, null, auth); return j.notFound ? null : fromFields(j.fields);
+  };
+  const setDoc = (p, obj) => (sb() ? sb().set(p, obj) : fsCall('PATCH', `${FS_BASE()}/${p}`, { fields: toFields(obj) }));
+  const delDoc = (p) => (sb() ? sb().del(p) : fsCall('DELETE', `${FS_BASE()}/${p}`));
   async function createDoc(col, id, obj) {
+    if (sb()) return sb().create(col, id, obj);
     const j = await fsCall('POST', `${FS_BASE()}/${col}?documentId=${encodeURIComponent(id)}`, { fields: toFields(obj) });
     return !j.exists;
   }
@@ -444,5 +459,5 @@ module.exports = function createCloud(ctx) {
   const publicConfig = () => (enabled() ? { projectId: cfg().projectId, apiKey: cfg().apiKey } : null);
   const releaseName = (name) => delDoc(`usernames/${name.toLowerCase()}`).catch(() => {});
   const uid = () => { const a = getConfig().account; return a && a.cloud ? a.id : null; };
-  return { token, uid, cfg, releaseName, reserveName, nameFree, saveCosmetics, setEmote, setSpray, loadCosmetics, deleteCosmetics, publicConfig, idle, enabled, isCloudAccount, register, login, loginGoogle, rename, resetPassword, push, pull, schedulePush, rememberMod, forget };
+  return { token, uid, cfg, sb, releaseName, reserveName, nameFree, saveCosmetics, setEmote, setSpray, loadCosmetics, deleteCosmetics, publicConfig, idle, enabled, isCloudAccount, register, login, loginGoogle, rename, resetPassword, push, pull, schedulePush, rememberMod, forget };
 };

@@ -578,7 +578,23 @@ const Admin = (() => {
           <div class="ad-save"><span class="muted" id="pvState"></span>
             <button class="btn btn-ghost" id="pvNew">Hesapsız önizle</button>
             <button class="btn btn-primary" id="pvAcc">Hesabımla önizle</button></div>
+        </div>
+        <div class="ad-card col">
+          <b>Veritabanı</b>
+          <p class="ad-p" id="dbInfo">Kontrol ediliyor...</p>
+          <p class="ad-p">Firebase'deki tüm verileri (profiller, coinler, envanterler, arkadaşlıklar, sohbetler, çekilişler) Supabase'e kopyalar. Firebase'deki veriler silinmez. Tekrar çalıştırmak güvenlidir: aynı belgeler üzerine yazılır.</p>
+          <div class="ad-save"><span class="muted" id="mgProg"></span><button class="btn btn-ghost" id="mgGo">Firebase'den Supabase'e taşı</button></div>
         </div>`;
+      sc('adminDbStats').then((r) => {
+        const el = $('#dbInfo'); if (!el) return;
+        el.textContent = r.kind === 'supabase' ? `Şu an kullanılan: Supabase · ${r.docs} belge · ${(r.bytes / 1048576).toFixed(1)} MB / 500 MB` : 'Şu an kullanılan: Firebase (cloud.json dosyasında Supabase ayarı yok)';
+      }).catch((e) => { const el = $('#dbInfo'); if (el) el.textContent = e.message; });
+      $('#mgGo').onclick = async () => {
+        if (!(await confirmBox('Veriler taşınsın mı?', "Firebase'deki tüm belgeler Supabase'e kopyalanacak. Bu işlem Firebase okuma kotası kullanır; kota yeni sıfırlandığında yap.", 'Taşı'))) return;
+        const b = $('#mgGo'); b.classList.add('loading');
+        try { const r = await sc('adminMigrate'); toast(`${r.total} belge Supabase'e taşındı.`, 'success'); $('#mgProg').textContent = `Bitti: ${r.total} belge`; }
+        catch (e) { toast(e.message, 'error'); } finally { b.classList.remove('loading'); }
+      };
       const pvGo = async (mode) => {
         try { await cx.previewStart(mode); toast('Önizleme penceresi açılıyor...', 'success'); }
         catch (e) { toast(e.message, 'error'); }
@@ -605,6 +621,7 @@ const Admin = (() => {
     $$('#adTabs button').forEach((b) => (b.onclick = () => show(b.dataset.t)));
     cx.on('preview:state', (p) => { const el = $('#pvState'); if (el) el.textContent = p && p.running ? 'Önizleme şu an açık' : ''; });
     cx.on('admin:publish', (p) => { const el = $('#puProg'); if (el) el.textContent = `${p.stage} ${p.current}/${p.total}`; });
+    cx.on('admin:migrate', (p) => { const el = $('#mgProg'); if (el) el.textContent = `${p.stage} · ${p.total} belge`; });
   }
   return { enter };
 })();

@@ -915,7 +915,10 @@ async function prepareCosmetics(p, gameDir) {
     }
   }
   await fsp.writeFile(path.join(cfgDir, 'self.json'), JSON.stringify(self));
-  await fsp.writeFile(path.join(cfgDir, 'cloud.json'), JSON.stringify(cloud.publicConfig() || {}));
+  // Supabase sürümünde oyundaki mod bulut okumalarını launcher'daki yerel köprüden yapar (ücretsiz, anlık)
+  let fsBase = null;
+  if (cloud.sb && cloud.sb()) { try { const br = await bridgeInfo(); fsBase = `http://127.0.0.1:${br.port}/fs/${br.token}`; fxStart(); } catch {} }
+  await fsp.writeFile(path.join(cfgDir, 'cloud.json'), JSON.stringify({ ...(cloud.publicConfig() || {}), ...(fsBase ? { fsBase } : {}) }));
   return { addMods: dir };
 }
 
@@ -979,6 +982,7 @@ function bridgeInfo() {
     const token = crypto.randomBytes(16).toString('hex');
     const srv = http.createServer(async (req, res) => {
       const reply = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)); };
+      if (req.url.startsWith(`/fs/${token}/`)) return fsBridge(req, res, req.url.slice(token.length + 5), reply);
       if (req.headers['x-cubixora'] !== token) return reply(403, { error: 'yetkisiz' });
       let body = '';
       req.on('data', (d) => { body += d; if (body.length > 3e5) req.destroy(); });
@@ -1057,6 +1061,74 @@ function bridgeInfo() {
     srv.on('error', () => resolve(null));
   });
 }
+// ---------------------------------------------------------------- mod için bulut köprüsü (Supabase sürümü)
+// Mod eskiden Firestore'u doğrudan (saniyede bir) sorguluyordu. Artık: emote/sprey olayları Supabase "fx" kanalından
+// anlık gelir ve bellekte tutulur; kozmetikler bir kez okunup önbellekte kalır (değişince fx kanalı haber verir).
+// Yanıtlar Firestore biçiminde verilir, böylece moddaki okuma kodu aynı kalır.
+const fxDocs = new Map();       // 'emotes/ad' | 'sprays/ad' -> { data, at }
+const cosCache = new Map();     // ad -> { doc|null, at }
+let fxStop = null;
+function fxStart() {
+  if (fxStop || !cloud.sb || !cloud.sb()) return;
+  cosCache.clear();
+  fxStop = cloud.sb().fxListen((d) => {
+    const p = String(d.path || '');
+    if (p.startsWith('cosmetics/')) { cosCache.delete(p.slice(10)); return; }
+    if (!/^(emotes|sprays)\/[a-z0-9_]{3,16}$/.test(p)) return;
+    if (d.deleted) fxDocs.delete(p); else fxDocs.set(p, { data: d.data || {}, at: Date.now() });
+    if (fxDocs.size > 2000) { const old = Date.now() - 60000; for (const [k, v] of fxDocs) if (v.at < old) fxDocs.delete(k); }
+  });
+}
+function fxEnd() { if (fxStop) { try { fxStop(); } catch {} fxStop = null; } fxDocs.clear(); }
+function fsVal(v) {
+  if (v === null || v === undefined) return { nullValue: null };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(fsVal) } };
+  switch (typeof v) {
+    case 'boolean': return { booleanValue: v };
+    case 'number': return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+    case 'string': return { stringValue: v };
+    case 'object': return { mapValue: { fields: fsFields(v) } };
+    default: return { stringValue: String(v) };
+  }
+}
+const fsFields = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, fsVal(v)]));
+const fsName = (p) => `projects/cubixora/databases/(default)/documents/${p}`;
+async function cosmeticDoc(name) {
+  const c = cosCache.get(name);
+  if (c && (c.doc || Date.now() - c.at < 30 * 60 * 1000)) return c.doc;
+  const d = await cloud.sb().get(`cosmetics/${name}`, false).catch(() => undefined);
+  if (d === undefined) return c ? c.doc : null;   // ağ hatası: eldekini ver
+  const doc = d ? (({ id, path: _p, _updated, ...rest }) => { void id; void _p; return { data: rest, at: _updated || Date.now() }; })(d) : null;
+  cosCache.set(name, { doc, at: Date.now() });
+  if (cosCache.size > 3000) cosCache.delete(cosCache.keys().next().value);
+  return doc;
+}
+function fsBridge(req, res, sub, reply) {
+  let body = '';
+  req.on('data', (d) => { body += d; if (body.length > 1e5) req.destroy(); });
+  req.on('end', async () => {
+    try {
+      if (!cloud.sb || !cloud.sb()) return reply(404, { error: 'kapalı' });
+      const m = /^\/documents\/cosmetics\/([a-z0-9_]{3,16})$/.exec(decodeURIComponent(sub));
+      if (req.method === 'GET' && m) {
+        const doc = await cosmeticDoc(m[1]);
+        if (!doc) return reply(404, { error: { code: 404, status: 'NOT_FOUND' } });
+        return reply(200, { name: fsName(`cosmetics/${m[1]}`), fields: fsFields(doc.data), updateTime: new Date(doc.at).toISOString() });
+      }
+      if (req.method === 'POST' && sub === '/documents:batchGet') {
+        const names = ((body ? JSON.parse(body) : {}).documents || []).slice(0, 120);
+        const readTime = new Date().toISOString();
+        return reply(200, names.map((n) => {
+          const p = String(n).split('/documents/')[1] || '';
+          const d = fxDocs.get(p);
+          return d ? { found: { name: n, fields: fsFields(d.data), updateTime: new Date(d.at).toISOString() }, readTime } : { missing: n, readTime };
+        }));
+      }
+      return reply(404, { error: 'bilinmeyen' });
+    } catch (e) { return reply(500, { error: e.message }); }
+  });
+}
+
 async function bridgeState() {
   const inv = cloud.isCloudAccount() ? social.inventory() : {};
   let shop = {};
@@ -1200,6 +1272,7 @@ async function launchProfileInner(profileId, opt = {}) {
     if (minutes > 0 && opt.server && !partnerSeen) social.track('partner_minutes', minutes);
     partnerSeen = false;
     send('game-state', { running: false, code });
+    fxEnd();
     cloud.schedulePush();
     if (config.settings.closeOnLaunch && win && !win.isDestroyed()) win.show();
   });
@@ -1658,7 +1731,7 @@ const SOCIAL_API = ['summary', 'refreshMe', 'updateProfile', 'getProfile', 'setS
   'adminReports', 'adminDeleteReport', 'adminGet', 'adminSet', 'adminNotify', 'adminDeleteNotification', 'adminUser', 'adminGrant', 'adminTake', 'coinBuy', 'adminRevoke', 'adminBan', 'adminBannedEmails', 'adminBanEmail', 'adminUnbanEmail', 'adminDeleteUser', 'adminSetRoles',
   'news', 'adminNewsList', 'adminNewsSave', 'adminNewsDelete', 'questView', 'claimQuestStep', 'claimQuestReward', 'levelView', 'claimLevel',
   'giveawayView', 'joinGiveaway', 'adminGiveaways', 'adminGiveawaySave', 'adminGiveawayEntries', 'adminGiveawayDraw', 'adminGiveawayDelete',
-  'uidOf', 'adminCodes', 'adminSaveCode', 'adminDeleteCode', 'adminBetaKeys', 'adminSaveBetaKey', 'adminDeleteBetaKey', 'adminPublish'];
+  'uidOf', 'adminCodes', 'adminSaveCode', 'adminDeleteCode', 'adminBetaKeys', 'adminSaveBetaKey', 'adminDeleteBetaKey', 'adminPublish', 'adminMigrate', 'adminDbStats'];
 handle('social:call', async (fn, ...args) => {
   if (!SOCIAL_API.includes(fn)) throw new Error('Bilinmeyen işlem: ' + fn);
   if (!cloud.isCloudAccount()) {

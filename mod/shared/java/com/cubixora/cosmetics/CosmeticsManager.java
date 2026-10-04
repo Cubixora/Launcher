@@ -41,7 +41,7 @@ public final class CosmeticsManager {
     private static final Set<String> KNOWN_WINGS = Set.of("ejderha", "melek", "gece");
 
     private static final HttpClient HTTP = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(8)).build();
-    @Nullable private static String projectId, apiKey;
+    @Nullable private static String projectId, apiKey, fsBase;
     @Nullable private static String selfName;
 
     private CosmeticsManager() {}
@@ -61,6 +61,8 @@ public final class CosmeticsManager {
                     projectId = o.get("projectId").getAsString();
                     apiKey = o.get("apiKey").getAsString();
                 }
+                // Supabase sürümü: bulut okumaları launcher üzerinden (yerel köprü) yapılır
+                fsBase = o.has("fsBase") ? o.get("fsBase").getAsString() : null;
             }
         } catch (Exception e) {
             Cubixora.LOG.warn("cloud.json okunamadı", e);
@@ -87,6 +89,7 @@ public final class CosmeticsManager {
     @Nullable public static String selfName() { return selfName; }
     @Nullable public static String projectId() { return projectId; }
     @Nullable public static String apiKey() { return apiKey; }
+    @Nullable public static String fsBase() { return fsBase; }
 
     /** Oyun içi gardroptan anında değişiklik: kendi kaydımızı günceller (bulut kaydını launcher yapar). */
     public static void setSelf(@Nullable String cape, @Nullable String wings, @Nullable Boolean pet) {
@@ -166,7 +169,8 @@ public final class CosmeticsManager {
             return;
         }
         if (!PENDING.add(key)) return;
-        String url = "https://firestore.googleapis.com/v1/projects/" + projectId
+        String url = fsBase != null ? fsBase + "/documents/cosmetics/" + URLEncoder.encode(key, StandardCharsets.UTF_8)
+                : "https://firestore.googleapis.com/v1/projects/" + projectId
                 + "/databases/(default)/documents/cosmetics/" + URLEncoder.encode(key, StandardCharsets.UTF_8)
                 + "?key=" + URLEncoder.encode(apiKey, StandardCharsets.UTF_8);
         HttpRequest req = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build();

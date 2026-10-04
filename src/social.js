@@ -1,5 +1,5 @@
 // Cubixora sosyal + ekonomi + admin (ana süreç).
-// Kalıcı veriler Firestore'da, anlık sinyaller (mesaj geldi, arama, istek, durum) Realtime Database'de.
+// Kalıcı veriler Supabase'de (ya da eski kurulumda Firestore'da), anlık sinyaller Supabase Realtime'da (eskisinde Realtime Database).
 const fs = require('fs');
 const fsp = fs.promises;
 const path = require('path');
@@ -52,7 +52,11 @@ module.exports = function createSocial(ctx) {
   const { cloud, getConfig, saveConfig, send, log, protect, unprotect, DATA_DIR, app } = ctx;
   const projectId = () => (cloud.cfg().projectId || '');
   const rtdbUrl = () => cloud.cfg().rtdbUrl || `https://${projectId()}-default-rtdb.europe-west1.firebasedatabase.app`;
-  const db = createDb({ projectId, apiKey: () => cloud.cfg().apiKey || '', token: () => cloud.token(), rtdbUrl });
+  // fdb: Firebase Firestore (güncelleme paketleri her zaman burada; EXE'deki başlatıcı oradan okur)
+  // db : asıl veritabanı. cloud.json'da Supabase ayarı varsa Supabase, yoksa Firestore.
+  const fdb = createDb({ projectId, apiKey: () => cloud.cfg().apiKey || '', token: () => cloud.token(), rtdbUrl });
+  const db = (cloud.sb && cloud.sb()) || fdb;
+  if (db !== fdb) log('[sosyal] veritabanı: Supabase');
 
   const me = () => cloud.uid();
   const acct = () => getConfig().account;
@@ -75,9 +79,14 @@ module.exports = function createSocial(ctx) {
     const c = cache.config[name];
     if (c && now() - c.at < maxAge) return c.value;
     try {
+      // Supabase: önce sadece değişiklik zamanına bak; değişmediyse büyük belge (mağaza görselleri) tekrar indirilmez
+      if (c && db.stamps) {
+        const st = await db.stamps([`config/${name}`], false);
+        if ((st[`config/${name}`] || 0) === (c.stamp || 0)) { c.at = now(); return c.value; }
+      }
       const d = await db.get(`config/${name}`, false);
       const value = d || fallback;
-      cache.config[name] = { at: now(), value };
+      cache.config[name] = { at: now(), value, stamp: d ? d._updated || 0 : 0 };
       return value;
     } catch (e) { return c ? c.value : fallback; }
   }
@@ -110,7 +119,7 @@ module.exports = function createSocial(ctx) {
     if (!p) return null;
     const pr = cache.presence[p.id] || {};
     let status = pr.s || 'offline';
-    if (!pr.t || now() - pr.t > STALE_MS) status = 'offline';
+    if (!pr.t || (!db.rtLive && now() - pr.t > STALE_MS)) status = 'offline';   // Supabase'de kopanlar sunucudan anında düşer
     if (status === 'invisible') status = 'offline';
     return {
       uid: p.id, displayName: p.displayName, handle: p.handle, mcName: p.mcName || '', avatar: p.avatar || '',
@@ -432,9 +441,18 @@ module.exports = function createSocial(ctx) {
     return 'none';
   }
   async function loadProfiles(uids) {
-    const need = uids.filter((u) => !cache.profiles.has(u) || now() - cache.profiles.get(u)._at > 5 * 60 * 1000);
+    let need = uids.filter((u) => !cache.profiles.has(u) || now() - cache.profiles.get(u)._at > 5 * 60 * 1000);
+    if (need.length && db.stamps) {
+      // önbellekte olup değişmeyenler tekrar indirilmez (Supabase veri çıkışı kotası)
+      const known = need.filter((u) => cache.profiles.has(u));
+      if (known.length) {
+        const st = await db.stamps(known.map((u) => `profiles/${u}`)).catch(() => null);
+        if (st) for (const u of known) { const p = cache.profiles.get(u); if ((st[`profiles/${u}`] || -1) === p._updated) p._at = now(); }
+        need = need.filter((u) => !cache.profiles.has(u) || now() - cache.profiles.get(u)._at > 5 * 60 * 1000);
+      }
+    }
     if (need.length) {
-      const docs = await db.batchGet(need.map((u) => `profiles/${u}`));
+      const docs = await db.batchGet(need.map((u) => `profiles/${u}`), { omit: ['bg'] });   // arka plan sadece profil açılınca indirilir
       for (const d of docs) cache.profiles.set(d.id, { ...d, _at: now() });
     }
     return uids.map((u) => cache.profiles.get(u)).filter(Boolean);
@@ -462,8 +480,8 @@ module.exports = function createSocial(ctx) {
   async function searchUsers(q, all = false) {
     q = String(q || '').trim().toLowerCase().replace(/^@/, '');
     let docs;
-    if (q) docs = await db.query('profiles', { where: [['handle', 'GREATER_THAN_OR_EQUAL', q], ['handle', 'LESS_THAN', q + '']], orderBy: [['handle', 'asc']], limit: 30 });
-    else docs = await db.query('profiles', { orderBy: [['created', 'desc']], limit: 40 });
+    if (q) docs = await db.query('profiles', { where: [['handle', 'GREATER_THAN_OR_EQUAL', q], ['handle', 'LESS_THAN', q + '']], orderBy: [['handle', 'asc']], limit: 30, omit: ['bg'] });
+    else docs = await db.query('profiles', { orderBy: [['created', 'desc']], limit: 40, omit: ['bg'] });
     await loadPresence();
     return docs.filter((d) => all || (d.id !== me() && !d.banned)).map((d) => ({ ...publicProfile(d), banned: !!d.banned, self: d.id === me(), friendship: friendState(d.id) }));
   }
@@ -1041,6 +1059,51 @@ module.exports = function createSocial(ctx) {
     return l.sort((a, b) => (b.at || 0) - (a.at || 0));
   }
   async function adminDeleteReport(id) { needAdmin(); await db.del(`reports/${String(id).replace(/[^a-z0-9]/gi, '')}`); return true; }
+  // ------------------------------------------------------------ Firebase -> Supabase taşıma (bir kez, admin)
+  // Hesaplar Firebase'de kaldığı için kimlikler (uid) aynıdır; tüm belgeler olduğu gibi kopyalanır.
+  async function adminMigrate() {
+    needAdmin();
+    if (db === fdb) throw new Error("Supabase ayarları yok: src\\cloud.json dosyasına supabaseUrl ve supabaseKey ekle.");
+    const TOP = ['config', 'news', 'notifications', 'giftCodes', 'betaKeys', 'users', 'emails', 'bannedEmails', 'usernames', 'handles', 'cosmetics',
+      'profiles', 'giveaways', 'privates', 'wallets', 'inventory', 'friendRequests', 'friendships', 'chats', 'groups', 'reports'];
+    const GROUPS = ['items', 'messages', 'entries'];
+    let total = 0, buf = [], bytes = 0;
+    const prog = (stage) => send('admin:migrate', { stage, total });
+    const flush = async () => { if (!buf.length) return; await db.rpc('fs_import', { docs: buf }); buf = []; bytes = 0; prog('Yazılıyor'); };
+    const push = async (d) => {
+      const { id, path: p, _updated, ...data } = d; void id;
+      if (!p || p === 'config/app' || p.startsWith('bundle/')) return;
+      const item = { path: p, data, updated: _updated || 0 };
+      const sz = JSON.stringify(item).length;
+      if (bytes && bytes + sz > 600000) await flush();
+      buf.push(item); bytes += sz; total++;
+    };
+    for (const col of TOP) {
+      let tok = '';
+      do {
+        prog(`Okunuyor: ${col}`);
+        const j = await fdb.listPage(col, { pageSize: 300, pageToken: tok });
+        for (const d of j.docs) await push(d);
+        tok = j.next;
+      } while (tok);
+    }
+    for (const g of GROUPS) {
+      let after = '';
+      for (;;) {
+        prog(`Okunuyor: ${g}`);
+        const docs = await fdb.queryGroup(g, { pageSize: 300, after });
+        for (const d of docs) await push(d);
+        if (docs.length < 300) break;
+        after = docs[docs.length - 1].path;
+      }
+    }
+    await flush();
+    cache.config = {};
+    log(`[taşıma] ${total} belge Supabase'e kopyalandı`);
+    return { total };
+  }
+  async function adminDbStats() { needAdmin(); if (db === fdb) return { kind: 'firestore' }; return { kind: 'supabase', ...(await db.rpc('fs_stats')) }; }
+
   async function adminDeleteNotification(id) { needAdmin(); await db.del(`notifications/${id}`); notifGlobal.at = 0; return true; }
   async function adminUser(q) {
     needAdmin();
@@ -1177,7 +1240,7 @@ module.exports = function createSocial(ctx) {
     const { createZip, collect } = require('./ziputil');
     if (!fs.existsSync(path.join(dir, 'main.js')) || !fs.existsSync(path.join(dir, 'renderer'))) throw new Error('Seçilen klasör launcher\'ın "src" klasörü değil.');
     const keyPem = fs.readFileSync(keyFile, 'utf8');
-    const cur = await db.get('config/app', false);
+    const cur = await fdb.get('config/app', false);
     const build = Math.max((cur && cur.build) || 0, (global.__cubixora && global.__cubixora.build) || 0) + 1;
     const files = collect(dir, dir, (rel) => /(^|\/)(node_modules|\.git)(\/|$)/.test(rel) || /\.key$/i.test(rel));
     const bj = files.find((f) => f.name === 'build.json');
@@ -1192,12 +1255,12 @@ module.exports = function createSocial(ctx) {
     const chunks = Math.ceil(b64.length / CH);
     send('admin:publish', { stage: 'Yükleniyor', current: 0, total: chunks });
     for (let i = 0; i < chunks; i++) {
-      await db.set(`bundle/b${build}-${i}`, { data: b64.slice(i * CH, (i + 1) * CH) });
+      await fdb.set(`bundle/b${build}-${i}`, { data: b64.slice(i * CH, (i + 1) * CH) });
       send('admin:publish', { stage: 'Yükleniyor', current: i + 1, total: chunks });
     }
-    await db.set('config/app', { build, chunks, sha256: sha, sig, size: zip.length, notes: String(notes || '').slice(0, 500), at: db.ts(now()) });
+    await fdb.set('config/app', { build, chunks, sha256: sha, sig, size: zip.length, notes: String(notes || '').slice(0, 500), at: fdb.ts(now()) });
     // eski paket parçalarını temizle
-    if (cur && cur.build && cur.chunks) for (let i = 0; i < cur.chunks + 2; i++) db.del(`bundle/b${cur.build - 1}-${i}`).catch(() => {});
+    if (cur && cur.build && cur.chunks) for (let i = 0; i < cur.chunks + 2; i++) fdb.del(`bundle/b${cur.build - 1}-${i}`).catch(() => {});
     const c = getConfig(); c.adminPublish = { dir, keyFile }; saveConfig();
     return { build, size: zip.length, files: files.length };
   }
@@ -1424,7 +1487,7 @@ module.exports = function createSocial(ctx) {
     conversations, messages, openDm, sendMessage, deleteMessage, createGroup, groupAction, markRead,
     notifications, markNotificationsSeen, activityOf, achievementView, claimAchievement, track,
     shop, buy, redeem, partners, limits, coinBuy, adminTake, achievements, addBetaKey, betaInfo, presets,
-    submitReport, adminReports, adminDeleteReport, adminGet, adminSet, adminNotify, adminDeleteNotification, adminUser, adminGrant, adminRevoke, adminBan, adminBannedEmails, adminBanEmail, adminUnbanEmail, adminDeleteUser, adminSetRoles, hasPlusPerk,
+    submitReport, adminMigrate, adminDbStats, adminReports, adminDeleteReport, adminGet, adminSet, adminNotify, adminDeleteNotification, adminUser, adminGrant, adminRevoke, adminBan, adminBannedEmails, adminBanEmail, adminUnbanEmail, adminDeleteUser, adminSetRoles, hasPlusPerk,
     adminCodes, adminSaveCode, adminDeleteCode, adminBetaKeys, adminSaveBetaKey, adminDeleteBetaKey, adminPublish,
     levelOf, lpFor, inventory: myInv, timedLive, timedAll: () => ({ ...timedCache }),
     news, adminNewsList, adminNewsSave, adminNewsDelete, questView, claimQuestStep, claimQuestReward, levelView, claimLevel, quests,

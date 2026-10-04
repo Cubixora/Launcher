@@ -43,7 +43,7 @@ public final class CxEmoteNet {
     public static void tick(MinecraftClient mc) {
         if (mc.world == null || mc.player == null) return;
         long now = System.currentTimeMillis();
-        if (now >= nextPoll && !inFlight) { nextPoll = now + 3000; poll(mc, now); }
+        if (now >= nextPoll && !inFlight) { nextPoll = now + (CosmeticsManager.fsBase() != null ? 1000 : 3000); poll(mc, now); }   // köprü yerel ve ücretsiz: 1 sn
         if (CxEmoteAnim.any() && (++tickN & 1) == 0) hearts(mc);
         // ateş efekti oyuncu katmanında çiziliyor (CxFlames); burada tik başına iş yok
     }
@@ -83,7 +83,9 @@ public final class CxEmoteNet {
         StringBuilder b = new StringBuilder("{\"documents\":[");
         for (int i = 0; i < names.size(); i++) b.append(i > 0 ? "," : "").append('"').append(base).append("emotes/").append(names.get(i)).append("\",\"").append(base).append("sprays/").append(names.get(i)).append('"');
         b.append("]}");
-        String url = "https://firestore.googleapis.com/v1/projects/" + pid + "/databases/(default)/documents:batchGet?key=" + URLEncoder.encode(key, StandardCharsets.UTF_8);
+        String fb = CosmeticsManager.fsBase();
+        String url = fb != null ? fb + "/documents:batchGet"
+                : "https://firestore.googleapis.com/v1/projects/" + pid + "/databases/(default)/documents:batchGet?key=" + URLEncoder.encode(key, StandardCharsets.UTF_8);
         HttpRequest req = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(8)).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(b.toString())).build();
         inFlight = true;
