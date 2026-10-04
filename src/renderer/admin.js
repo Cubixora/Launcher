@@ -275,14 +275,17 @@ const Admin = (() => {
       const open = new Set();
       const blank = () => ({ title: '', desc: '', prize: '', image: '', winnerCount: 1, startsAt: 0, drawAt: Date.now() + 7 * 864e5, conds: [{ stat: 'launcher_minutes', goal: 60, title: '' }, { stat: 'partner_minutes', goal: 15, title: '' }] });
       const stLabel = (g) => (g.status === 'drawn' ? `Açıklandı · ${(g.winners || []).length} kazanan` : Date.now() >= g.drawAt ? 'Kura bekliyor' : 'Aktif');
-      const formHtml = (f) => `<div class="ad-card"><b>${f.id ? 'Çekilişi düzenle' : 'Yeni çekiliş'}</b>
-        <div class="ad-fields wide" id="gwF">
+      const formHtml = (f) => `<div class="ad-card gw-form">
+        <div class="gw-fh"><span class="gw-fh-ic">🎁</span><div><b>${f.id ? 'Çekilişi düzenle' : 'Yeni çekiliş'}</b><small>Bilgileri doldur, koşulları seç, başlat. Kaydettiğin an herkese gider.</small></div></div>
+        <div class="gw-left">
+        <div class="ad-fields" id="gwF">
           ${field('Başlık', inp('title', f.title, 'Ekim Çekilişi'))}${field('Ödül', inp('prize', f.prize, 'Cubixora+ 1 ay / 500 coin / VIP'))}
           ${field('Açıklama', inp('desc', f.desc, 'Kısa açıklama'))}${field('Kazanan sayısı', inp('winnerCount', f.winnerCount, '1', 'number'))}
           ${field('Başlangıç (boş = hemen)', `<input class="input" type="datetime-local" data-k="startsAt" value="${toLocal(f.startsAt)}" />`)}
           ${field('Sonuçların açıklanacağı zaman', `<input class="input" type="datetime-local" data-k="drawAt" value="${toLocal(f.drawAt)}" />`)}
         </div>
-        <div class="gw-ad-img" id="gwImg" style="${f.image ? `background-image:url('${f.image}')` : ''}">${f.image ? '' : 'Görsel seç (isteğe bağlı) · 800×250'}</div>
+        <div class="gw-ad-img ${f.image ? 'has' : ''}" id="gwImg" style="${f.image ? `background-image:url('${f.image}')` : ''}">${f.image ? '<span class="gw-img-chg">Görseli değiştir</span>' : '<span><b>＋</b> Görsel seç (isteğe bağlı)<small>800×250 önerilir</small></span>'}</div>
+        </div>
         <div class="gw-ad-conds"><b>Katılma koşulları (görevler)</b><small class="muted">Süre koşullarında hedef <b>dakika</b> cinsindendir (1 saat = 60). İlerleme çekiliş başladıktan sonra sayılır. Başlık boşsa otomatik yazılır.</small>
           ${f.conds.map((c, j) => `<div class="gw-ad-cond" data-j="${j}">${sel('stat', c.stat, GSTATS)}${inp('goal', c.goal, 'Hedef', 'number')}${inp('title', c.title, 'Başlık (isteğe bağlı)')}<button class="icon-btn tiny danger" data-cdel>✕</button></div>`).join('')}
           <button class="btn btn-ghost tiny" id="gwCAdd">+ Koşul ekle</button></div>
