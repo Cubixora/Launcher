@@ -51,7 +51,9 @@ function choose() {
   const s = readState();
   s.bad = s.bad || [];
   const dir = s.build && path.join(APP_DIR, `b${s.build}`);
-  const usable = s.build > EMBEDDED_BUILD && !s.bad.includes(s.build) && dir && fs.existsSync(path.join(dir, 'main.js'));
+  // Firebase döneminden kalan eski paket (cloud.json'da Supabase yok) asla çalıştırılmaz: kendini güncelleyemez, EXE'deki kod kullanılır
+  const modern = (d) => { try { return !!JSON.parse(fs.readFileSync(path.join(d, 'cloud.json'), 'utf8')).supabaseUrl; } catch { return false; } };
+  const usable = s.build > EMBEDDED_BUILD && !s.bad.includes(s.build) && dir && fs.existsSync(path.join(dir, 'main.js')) && modern(dir);
   if (!usable) return { build: EMBEDDED_BUILD, dir: EMBEDDED_DIR, source: 'exe' };
   // önceki açılış bu paketle tamamlanamadıysa (çöktüyse) bir kez daha dene, sonra vazgeç
   if (s.starting === s.build) {

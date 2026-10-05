@@ -1232,6 +1232,8 @@ module.exports = function createSocial(ctx) {
       const b = Number((/^cubixora-b(\d+)\.zip$/.exec(a.name) || [])[1] || 0);
       if (b && b < build - 1) await ghCall(token, 'DELETE', `/repos/${GH_REPO}/releases/assets/${a.id}`).catch(() => {});
     }
+    // kod klasöründeki sürüm numarası da güncellenir: sonra yapılan EXE en son sürümle gelir (eski indirilmiş paketlerin gerisinde kalmaz)
+    try { fs.writeFileSync(path.join(dir, 'build.json'), bjData); } catch {}
     c.adminPublish = { ...(c.adminPublish || {}), dir, keyFile, gh: protect(token) }; saveConfig();
     return { build, size: zip.length, files: files.length };
   }
