@@ -1,4 +1,4 @@
-// Supabase istemcisi: belgeler (yol -> JSON) + anlık kanallar (Realtime).
+// Supabase istemcisi: fsdb.js ile birebir aynı arayüz (Firestore benzeri belgeler + anlık kanallar).
 // Giriş Supabase Auth ile yapılır; oturum anahtarı her istekte gönderilir.
 // Tüm okuma/yazmalar sunucudaki fs_* fonksiyonlarından geçer ve orada kurallarla denetlenir (supabase/cubixora.sql).
 const tls = require('tls');

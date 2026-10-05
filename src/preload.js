@@ -74,13 +74,14 @@ contextBridge.exposeInMainWorld('cx', {
   autologinList: () => invoke('settings:autologinList'),
   callHotkeys: (on) => invoke('call:hotkeys', on),
   publishInfo: () => invoke('admin:publishInfo'),
+  adminGoogleToken: () => invoke('admin:googleToken'),
   previewInfo: () => invoke('app:previewInfo'),
   previewExit: () => invoke('preview:exit'),
   previewStart: (mode) => invoke('admin:previewStart', mode),
   previewState: () => invoke('admin:previewState'),
   on: (ch, fn) => {
     const allowed = ['log', 'progress', 'game-state', 'account', 'sync', 'social:me', 'social:signal', 'social:reward', 'social:quest', 'timed:expired', 'social:conn',
-      'social:error', 'app:update', 'admin:publish', 'notify:click', 'call:hotkey', 'content:optimize', 'social:presence', 'cosmetics:changed', 'voice:want', 'voice:mute', 'voice:ctl', 'voice:devices-req', 'social:banned', 'preview:state', 'social:giveaways'];
+      'social:error', 'app:update', 'admin:publish', 'notify:click', 'call:hotkey', 'content:optimize', 'social:presence', 'cosmetics:changed', 'voice:want', 'voice:mute', 'voice:ctl', 'voice:devices-req', 'social:banned', 'preview:state', 'social:giveaways', 'admin:migrate'];
     if (!allowed.includes(ch)) return;
     ipcRenderer.on(ch, (_e, data) => fn(data));
   }

@@ -1744,7 +1744,7 @@ const SOCIAL_API = ['summary', 'refreshMe', 'updateProfile', 'getProfile', 'setS
   'adminReports', 'adminDeleteReport', 'adminGet', 'adminSet', 'adminNotify', 'adminDeleteNotification', 'adminUser', 'adminGrant', 'adminTake', 'coinBuy', 'adminRevoke', 'adminBan', 'adminBannedEmails', 'adminBanEmail', 'adminUnbanEmail', 'adminDeleteUser', 'adminSetRoles',
   'news', 'adminNewsList', 'adminNewsSave', 'adminNewsDelete', 'questView', 'claimQuestStep', 'claimQuestReward', 'levelView', 'claimLevel',
   'giveawayView', 'joinGiveaway', 'adminGiveaways', 'adminGiveawaySave', 'adminGiveawayEntries', 'adminGiveawayDraw', 'adminGiveawayDelete',
-  'uidOf', 'adminCodes', 'adminSaveCode', 'adminDeleteCode', 'adminBetaKeys', 'adminSaveBetaKey', 'adminDeleteBetaKey', 'adminPublish', 'adminDbStats'];
+  'uidOf', 'adminCodes', 'adminSaveCode', 'adminDeleteCode', 'adminBetaKeys', 'adminSaveBetaKey', 'adminDeleteBetaKey', 'adminPublish', 'adminMigrate', 'adminDbStats'];
 handle('social:call', async (fn, ...args) => {
   if (!SOCIAL_API.includes(fn)) throw new Error('Bilinmeyen işlem: ' + fn);
   if (!cloud.isCloudAccount()) {
@@ -1927,10 +1927,12 @@ handle('admin:previewStart', async (mode) => {
   send('preview:state', { running: true });
   return true;
 });
+// GEÇİCİ (Firebase'den geçiş): admin eski Firebase hesabına Google ile bağlanır
+handle('admin:googleToken', async () => loginSocial('google', { tokenOnly: true }));
 handle('admin:publishInfo', async () => {
   const d = path.join(app.getPath('desktop'), 'cubixora-launcher');
   const c = config.adminPublish || {};
   return { dir: c.dir || path.join(d, 'src'), keyFile: c.keyFile || path.join(d, 'GIZLI-yayin-anahtari.key'),
     dirOk: fs.existsSync(path.join(c.dir || path.join(d, 'src'), 'main.js')), keyOk: fs.existsSync(c.keyFile || path.join(d, 'GIZLI-yayin-anahtari.key')),
-    build: global.__cubixora ? global.__cubixora.build : 0, ghSaved: !!c.gh };
+    build: global.__cubixora ? global.__cubixora.build : 0, ghSaved: !!c.gh, legacy: !!(cloud.cfg().firebaseLegacy && cloud.cfg().firebaseLegacy.apiKey) };
 });
