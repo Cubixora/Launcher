@@ -55,7 +55,8 @@ Son sürümü sağdaki **[Releases](../../releases/latest)** bölümünden indir
 src/            Launcher (Electron ana süreç + arayüz)
   boot.js       Açılış: imzalı güncelleme paketini doğrular ve yükler
   main.js       Ana süreç: oyun başlatma, profiller, içerik, IPC
-  social.js     Arkadaşlar, sohbet, mağaza, coin, admin işlemleri (Firestore)
+  sbdb.js       Supabase istemcisi (belgeler + anlık kanallar)
+  social.js     Arkadaşlar, sohbet, mağaza, coin, admin işlemleri (Supabase)
   renderer/     Arayüz (HTML/CSS/JS, framework yok)
 mod/            Cubixora Client (Fabric) — her Minecraft sürümü için ayrı klasör
   shared/       Tüm sürümlerin ortak kodu ve dokuları
@@ -74,7 +75,7 @@ npm install
 ```
 
 1. `src/oauth.example.json` dosyasını `src/oauth.json` olarak kopyalayıp kendi Google OAuth bilgilerini yaz (Google girişi için).
-2. `src/cloud.json` içine kendi Firebase projenin bilgilerini koy.
+2. Kendi Supabase projende `supabase/cubixora.sql` dosyasını çalıştır, `src/cloud.json` içine projenin adresini ve publishable anahtarını yaz.
 3. Çalıştır: `npm start`
 4. Kurulum dosyası (EXE): `npm run dist`
 5. Mod: `mod` klasöründe `gradlew build` (JDK 25 ile; derlenen modlar `src/mod-jars` altına kopyalanır)

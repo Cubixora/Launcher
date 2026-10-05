@@ -10,7 +10,6 @@
 !/supabase/
 /supabase/*
 !/supabase/cubixora.sql
-!/supabase/kullanici-tasi.js
 
 # --- GİZLİ: asla GitHub'a gitmesin
 src/oauth.json
