@@ -86,7 +86,7 @@
             <!-- KAYIT -->
             <form class="auth-view" id="registerForm" data-view="register" autocomplete="off" novalidate>
               <h2>Cubixora hesabı oluştur</h2>
-              <p class="auth-sub">Hesabın anında oluşur, kullanıcı adın oyun içi adın olur.</p>
+              <p class="auth-sub" id="rgSub">Hesabın anında oluşur, kullanıcı adın oyun içi adın olur.</p>
               <label class="fld"><span>Kullanıcı adı</span>
                 <input class="input" id="rgName" maxlength="16" placeholder="Minecraft'taki adın" spellcheck="false" /></label>
               <label class="fld"><span>E-posta</span>
@@ -557,7 +557,7 @@
     <div class="up-actions"><button class="btn btn-primary" id="upGoogle">Google ile bağla</button><button class="btn btn-ghost" id="upMailBtn">E-posta ile kaydol</button></div>
     <form id="upForm" class="hidden" autocomplete="off">
       <label class="fld"><span>E-posta</span><input class="input" id="upMail" type="email" placeholder="ornek@mail.com" spellcheck="false" /></label>
-      <label class="fld"><span>Şifre</span><input class="input" id="upPass" type="password" placeholder="en az 6 karakter" /></label>
+      <label class="fld"><span>Şifre</span><input class="input" id="upPass" type="password" placeholder="en az 8 karakter" /></label>
       <label class="fld"><span>Şifre tekrar</span><input class="input" id="upPass2" type="password" /></label>
       <small class="up-note">Kullanıcı adın Microsoft adınla aynı olacak.</small>
       <button class="btn btn-primary" id="upGo" type="submit">Hesabı oluştur</button>

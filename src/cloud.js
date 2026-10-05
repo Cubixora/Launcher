@@ -26,6 +26,8 @@ module.exports = function createCloud(ctx) {
   }
   const enabled = () => !!(cfg().supabaseUrl && cfg().supabaseKey);
   const SB = () => String(cfg().supabaseUrl || '').replace(/\/+$/, '');
+  // Cubixora sitesi: hesaplar sitedekiyle ortak (kayıt, kullanıcı adıyla giriş ve şifre sıfırlama site üzerinden)
+  const SITE = () => String(cfg().siteUrl || 'https://cubixora.com').replace(/\/+$/, '');
 
   // ------------------------------------------------------------ hata metinleri
   const AUTH_ERRORS = {
@@ -33,8 +35,8 @@ module.exports = function createCloud(ctx) {
     email_exists: 'Bu e-posta ile zaten bir hesap var. Giriş yapmayı dene.',
     invalid_credentials: 'E-posta veya şifre hatalı.',
     email_address_invalid: 'Geçerli bir e-posta adresi yaz.',
-    validation_failed: 'Geçerli bir e-posta adresi ve en az 6 karakterli şifre yaz.',
-    weak_password: 'Şifre en az 6 karakter olmalı.',
+    validation_failed: 'Geçerli bir e-posta adresi ve en az 8 karakterli şifre yaz.',
+    weak_password: 'Şifre en az 8 karakter olmalı.',
     user_banned: 'Bu hesap devre dışı bırakılmış.',
     over_request_rate_limit: 'Çok fazla deneme yapıldı. Biraz bekleyip tekrar dene.',
     over_email_send_rate_limit: 'Çok fazla e-posta istendi. Biraz bekleyip tekrar dene.',
@@ -67,6 +69,17 @@ module.exports = function createCloud(ctx) {
     } catch { throw new Error('Bulut sunucusuna ulaşılamadı. İnternet bağlantını kontrol et.'); }
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw authError(j, r.status);
+    return j;
+  }
+
+  // site hesap API'si (/api/launcher/kayit, /api/launcher/giris) -> Supabase oturumu
+  async function siteCall(pathQ, body) {
+    let r;
+    try {
+      r = await fetch(`${SITE()}/api/launcher/${pathQ}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': UA || 'Cubixora-Launcher' }, body: JSON.stringify(body || {}) });
+    } catch { throw new Error('Cubixora sitesine ulaşılamadı. İnternet bağlantını kontrol et.'); }
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.access_token) throw new Error(j.error || `Site hatası (${r.status}). Biraz sonra tekrar dene.`);
     return j;
   }
 
@@ -126,20 +139,26 @@ module.exports = function createCloud(ctx) {
       googleName: meta.full_name || meta.name || null, photo: meta.avatar_url || meta.picture || null };
   }
 
+  // Kayıt cubixora.com üzerinden açılır (site hesabı = launcher hesabı); oyuncu kaydı veritabanında hesapla birlikte oluşur
   async function register({ username, email, password }) {
     if (!(await nameFree(username))) throw new Error('Bu kullanıcı adı alınmış, başka bir ad seç.');
-    const res = await authCall('signup', { email, password });
-    if (!res.access_token) throw new Error('Hesap açıldı. E-postana gelen doğrulama bağlantısına tıkla, sonra giriş yap.');
+    const res = await siteCall('kayit', { username, email, password });
     remember(res);
     const uid = uidOf(res.user);
-    if (!(await reserveName(username, uid))) throw new Error('Bu kullanıcı adı az önce alındı. Giriş yapıp başka bir ad seçebilirsin.');
-    const user = { username, uuid: crypto.randomUUID().replace(/-/g, ''), nick: 1 };
-    await setDoc(`users/${uid}`, { ...user, data: '', updated: 0 });
+    let user = await getDoc(`users/${uid}`);
+    if (!user || String(user.username || '').toLowerCase() !== username.toLowerCase()) {
+      if (!(await reserveName(username, uid))) throw new Error('Bu kullanıcı adı az önce alındı. Giriş yapıp başka bir ad seçebilirsin.');
+      user = { username, uuid: (user && user.uuid) || crypto.randomUUID().replace(/-/g, ''), nick: 1 };
+      await setDoc(`users/${uid}`, { ...user, data: '', updated: 0 });
+    }
     return sessionFrom(res, user, 'local', email);
   }
 
+  // e-posta ile doğrudan, kullanıcı adıyla site üzerinden giriş
   async function login({ email, password }) {
-    const res = await authCall('token?grant_type=password', { email, password });
+    const res = String(email).includes('@')
+      ? await authCall('token?grant_type=password', { email, password })
+      : await siteCall('giris', { login: email, password });
     remember(res);
     const uid = uidOf(res.user);
     let user = await getDoc(`users/${uid}`);
@@ -193,6 +212,8 @@ module.exports = function createCloud(ctx) {
   // şifre sıfırlama: e-postaya 6 haneli kod gider (Supabase > Authentication > Emails > Reset Password şablonunda {{ .Token }}),
   // oyuncu kodu ve yeni şifresini launcher'a yazar. Tarayıcıda açılacak bir sayfa gerekmez.
   const resetPassword = (email) => authCall('recover', { email });
+  const resetUrl = () => `${SITE()}/sifre-sifirla`;
+  const registerUrl = () => `${SITE()}/kayit-ol`;
   async function resetConfirm({ email, code, password }) {
     if (!/^\d{6,8}$/.test(String(code || '').trim())) throw new Error('E-postadaki kodu yaz.');
     if (String(password || '').length < 6) throw new Error('Şifre en az 6 karakter olmalı.');
@@ -448,5 +469,5 @@ module.exports = function createCloud(ctx) {
   const publicConfig = () => (enabled() ? { projectId: 'cubixora', apiKey: 'local' } : null);
   const releaseName = (name) => delDoc(`usernames/${name.toLowerCase()}`).catch(() => {});
   const uid = () => { const a = getConfig().account; return a && a.cloud ? a.id : null; };
-  return { token, uid, cfg, sb, releaseName, reserveName, nameFree, saveCosmetics, setEmote, setSpray, loadCosmetics, deleteCosmetics, publicConfig, idle, enabled, isCloudAccount, register, login, loginGoogle, rename, resetPassword, resetConfirm, push, pull, schedulePush, rememberMod, forget };
+  return { token, uid, cfg, sb, releaseName, reserveName, nameFree, saveCosmetics, setEmote, setSpray, loadCosmetics, deleteCosmetics, publicConfig, idle, enabled, isCloudAccount, register, login, loginGoogle, rename, resetPassword, resetConfirm, resetUrl, registerUrl, push, pull, schedulePush, rememberMod, forget };
 };

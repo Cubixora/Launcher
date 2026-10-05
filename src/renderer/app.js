@@ -118,7 +118,7 @@ function openUpgrade() {
     e.preventDefault();
     const mail = $('#upMail').value.trim(), p1 = $('#upPass').value, p2 = $('#upPass2').value;
     if (!MAIL_RE.test(mail)) return toast('Geçerli bir e-posta adresi yaz.', 'error');
-    if (p1.length < 6) return toast('Şifre en az 6 karakter olmalı.', 'error');
+    if (p1.length < 8) return toast('Şifre en az 8 karakter olmalı.', 'error');
     if (p1 !== p2) return toast('Şifreler birbiriyle aynı değil.', 'error');
     const b = $('#upGo'); b.classList.add('loading');
     await done(cx.upgradeMs('mail', { email: mail, password: p1, password2: p2 }));
@@ -341,7 +341,7 @@ async function runAuth(btn, fn) {
 function submitLogin(e) {
   e.preventDefault();
   const login = $('#liLogin'), pass = $('#liPass');
-  if (!login.value.trim()) return fail(login, 'E-posta adresini yaz.');
+  if (!login.value.trim()) return fail(login, 'E-posta adresini ya da kullanıcı adını yaz.');
   if (!pass.value) return fail(pass, 'Şifreni yaz.');
   runAuth($('#liBtn'), async () => { const acc = await cx.loginLocal({ login: login.value, password: pass.value }); pass.value = ''; return acc; });
 }
@@ -350,7 +350,8 @@ function submitRegister(e) {
   const name = $('#rgName'), mail = $('#rgMail'), p1 = $('#rgPass'), p2 = $('#rgPass2');
   if (!NAME_RE.test(name.value.trim())) return fail(name, 'Kullanıcı adı 3-16 karakter olmalı; sadece harf, rakam ve _ kullan.');
   if (!MAIL_RE.test(mail.value.trim())) return fail(mail, 'Geçerli bir e-posta adresi yaz.');
-  if (p1.value.length < 6) return fail(p1, 'Şifre en az 6 karakter olmalı.');
+  const min = S.cloud && S.cloud.enabled ? 8 : 6;
+  if (p1.value.length < min) return fail(p1, `Şifre en az ${min} karakter olmalı.`);
   if (p1.value !== p2.value) return fail(p2, 'Şifreler birbiriyle aynı değil.');
   runAuth($('#rgBtn'), async () => {
     const acc = await cx.register({ username: name.value, email: mail.value, password: p1.value, password2: p2.value });
@@ -799,42 +800,12 @@ function bind() {
     toast('Yeni güncelleme geldi · launcher birkaç saniye içinde yenileniyor...', 'success');
     setTimeout(() => { if (!S.gameRunning) cx.restart(); }, 5000);   // oyun açık değilse kendiliğinden uygula
   });
+  // şifre sıfırlama cubixora.com'da (hesap siteyle ortak); yeni şifreyle launcher'a da girilir
   $('#forgotBtn').onclick = async () => {
-    const email = $('#liLogin').value.trim();
-    if (!MAIL_RE.test(email)) { fail($('#liLogin'), 'Şifre sıfırlama bağlantısı için önce e-posta adresini yaz.'); return; }
-    try { await cx.resetPassword(email); toast('Şifre sıfırlama kodu e-postana gönderildi. Gelen kutunu (ve spam klasörünü) kontrol et.', 'success'); openResetCode(email); }
+    try { await cx.forgotPassword(); toast('Şifre sıfırlama sayfası tarayıcında açıldı. Yeni şifreni belirleyip buradan giriş yap.', 'success'); }
     catch (e) { toast(e.message, 'error'); }
   };
 }
-// e-postadaki kodla yeni şifre belirleme penceresi
-function openResetCode(email) {
-  let w = $('#resetWin');
-  if (!w) {
-    w = document.createElement('div');
-    w.id = 'resetWin'; w.className = 'modal hidden';
-    w.innerHTML = `<div class="confirm"><b>Yeni şifre belirle</b><p id="rsText"></p>
-      <input class="input" id="rsCode" inputmode="numeric" maxlength="8" placeholder="E-postadaki kod" autocomplete="one-time-code" />
-      <input class="input" id="rsPass" type="password" placeholder="Yeni şifre (en az 6 karakter)" autocomplete="new-password" style="margin-top:8px" />
-      <div class="nick-actions"><button class="btn btn-ghost" id="rsNo">Vazgeç</button><button class="btn btn-primary" id="rsYes">Şifreyi değiştir</button></div></div>`;
-    document.body.appendChild(w);
-  }
-  $('#rsText').textContent = `${email} adresine gelen kodu ve yeni şifreni yaz.`;
-  $('#rsCode').value = ''; $('#rsPass').value = '';
-  w.classList.remove('hidden');
-  setTimeout(() => $('#rsCode').focus(), 50);
-  $('#rsNo').onclick = () => w.classList.add('hidden');
-  $('#rsYes').onclick = async () => {
-    const b = $('#rsYes'); b.classList.add('loading');
-    try {
-      await cx.resetConfirm({ email, code: $('#rsCode').value, password: $('#rsPass').value });
-      w.classList.add('hidden');
-      $('#liLogin').value = email;
-      toast('Şifren değiştirildi. Yeni şifrenle giriş yapabilirsin.', 'success');
-    } catch (e) { toast(e.message, 'error'); } finally { b.classList.remove('loading'); }
-  };
-}
-
-
 // Önizleme (Admin > Test et): başka bir bilgisayarda açılmış gibi çalışan ayrı pencere; üstte çıkış çubuğu görünür
 function mountPreviewBar(info) {
   const st = document.createElement('style');
@@ -869,7 +840,8 @@ async function boot() {
   $('#swVersion').textContent = `v${st.version} · paket #${b.build || 0}`;
   bind();
   const cloudOn = !!(S.cloud && S.cloud.enabled);
-  $('#liLabel').textContent = cloudOn ? 'E-posta' : 'E-posta veya kullanıcı adı';
+  $('#liLabel').textContent = 'E-posta veya kullanıcı adı';
+  if (cloudOn) { $('#rgPass').placeholder = 'En az 8 karakter'; $('#rgSub').textContent = 'Hesabın cubixora.com ile ortak: sitede de aynı bilgilerle giriş yaparsın.'; }
   $('#forgotBtn').classList.toggle('hidden', !cloudOn);
   startBackground();
   heroParallax();

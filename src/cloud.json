@@ -1,6 +1,7 @@
 {
-  "supabaseUrl": "https://mnkkhlceubglkxlvjtzl.supabase.co",
-  "supabaseKey": "sb_publishable_NxYMNgjy_-669uKkSolXYg_K2JUcz8I",
+  "supabaseUrl": "https://uvixizctyvxniompraka.supabase.co",
+  "supabaseKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2aXhpemN0eXZ4bmlvbXByYWthIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTEwMzI3OTksImV4cCI6MjEwNjYwODc5OX0.xcOxupHYTfXmWadCltSHHVEfTWPyFe5QKx_SOLvwwvI",
+  "siteUrl": "https://cubixora.com",
   "firebaseLegacy": {
     "apiKey": "AIzaSyD7idh75N_ulMnAifBTtcIG3Bn9IqQiibc",
     "projectId": "cubixora-launcher"

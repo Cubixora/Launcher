@@ -346,7 +346,7 @@ async function registerLocal({ username, email, password, password2 } = {}) {
   password = String(password || '');
   if (!OFFLINE_NAME.test(username)) throw new Error('Kullanıcı adı 3-16 karakter olmalı ve sadece harf, rakam ve _ içermeli.');
   if (!EMAIL_RE.test(email)) throw new Error('Geçerli bir e-posta adresi yaz.');
-  if (password.length < 6) throw new Error('Şifre en az 6 karakter olmalı.');
+  if (password.length < (cloud.enabled() ? 8 : 6)) throw new Error(`Şifre en az ${cloud.enabled() ? 8 : 6} karakter olmalı.`);
   if (password !== String(password2 || '')) throw new Error('Şifreler birbiriyle aynı değil.');
   if (cloud.enabled()) return activateAccount({ ...(await cloud.register({ username, email, password })), isNew: true });
   const db = loadAccounts();
@@ -365,9 +365,9 @@ async function registerLocal({ username, email, password, password2 } = {}) {
 async function loginLocal({ login, password } = {}) {
   login = String(login || '').trim().toLowerCase();
   password = String(password || '');
-  if (!login || !password) throw new Error('E-posta ve şifreni yaz.');
+  if (!login || !password) throw new Error('E-posta / kullanıcı adı ve şifreni yaz.');
   if (cloud.enabled()) {
-    if (!EMAIL_RE.test(login)) throw new Error('Giriş için e-posta adresini yaz.');
+    if (!EMAIL_RE.test(login) && !OFFLINE_NAME.test(login)) throw new Error('Geçerli bir e-posta adresi ya da kullanıcı adı yaz.');
     return activateAccount(await cloud.login({ email: login, password }));
   }
   const db = loadAccounts();
@@ -1608,6 +1608,8 @@ handle('auth:reset', async (email) => {
   await cloud.resetPassword(email);
   return true;
 });
+// şifre sıfırlama cubixora.com'da yapılır (hesaplar siteyle ortak)
+handle('auth:forgot', async () => { await shell.openExternal(cloud.resetUrl()); return true; });
 handle('auth:resetConfirm', async (p) => {
   if (!cloud.enabled()) throw new Error('Şifre sıfırlama sadece bulut hesaplarında çalışır.');
   const email = String((p && p.email) || '').trim().toLowerCase();
