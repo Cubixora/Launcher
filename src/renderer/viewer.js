@@ -729,8 +729,8 @@ void main(){vec4 c=texture2D(t,vUv);if(c.a<cut)discard;gl_FragColor=vec4(c.rgb*c
       if (this._page === undefined) this._page = this.c.closest('.page') || null;
       const idle = document.hidden || !this.c.isConnected || this.c.offsetParent === null || (this._page && !this._page.classList.contains('active'));   // başka sayfadayken hiç çizme
       if (!this.P || idle) { this._last = 0; return false; }
-      // oyun açıkken önizleme daha düşük hızda canlı kalır (WebGL ile ~30, eski çizimle ~11 kare/sn): düğmeler çalışır, işlemci oyuna kalır
-      if (window.CX_SUSPEND && !this._needsPose && this._last && now - this._last < (this._gl ? 33 : 90)) { const d = this._glDirty; this._glDirty = false; return !!d; }
+      // oyun açıkken önizleme kendiliğinden canlanmaz (ekran kartı oyuna kalsın); sürüklenince ya da değişince çizilir
+      if (window.CX_SUSPEND && !this._needsPose && !this.dragging && this._last) { const d = this._glDirty; this._glDirty = false; return !!d; }
       this._needsPose = false;
       const t = this.timeOverride != null ? this.timeOverride : (now - this.t0) / 1000, S = this.S, P = this.P;
       if (this.options.autoRotate && !this.dragging && (!this.lastDrag || now - this.lastDrag > 2500)) this.yaw += 0.18;

@@ -43,9 +43,10 @@ public final class CxPlayersScreen extends Screen {
         CxClient.save();
     }
     /** Köprüye gönderilecek küçük harfli susturma listesi (JSON dizisi). */
+    private static final java.util.regex.Pattern NON_NAME = java.util.regex.Pattern.compile("[^a-z0-9_]");
     public static String mutedJson() {
         StringBuilder b = new StringBuilder("[");
-        for (int i = 0; i < CxClient.settings.muted.size(); i++) { if (i > 0) b.append(','); b.append('"').append(CxClient.settings.muted.get(i).replaceAll("[^a-z0-9_]", "")).append('"'); }
+        for (int i = 0; i < CxClient.settings.muted.size(); i++) { if (i > 0) b.append(','); b.append('"').append(NON_NAME.matcher(CxClient.settings.muted.get(i)).replaceAll("")).append('"'); }
         return b.append(']').toString();
     }
 

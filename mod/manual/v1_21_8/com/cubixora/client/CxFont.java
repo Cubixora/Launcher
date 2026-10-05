@@ -15,7 +15,14 @@ public final class CxFont {
         if (!kind.equals("ui") && !CxFontFilter.loaded(p)) p = CxFonts.path("ui");   // bu boy henüz yüklenmediyse (stil yeni değişti) aynı stilin yazı boyu
         return CACHE.computeIfAbsent(p, q -> Identifier.of("cubixora", q));
     }
-    public static Identifier fUi() { return get("ui"); }
+    /** Varsayılan yazının yerine geçen yazı tipi; her harfte çağrıldığı için stil değişmedikçe hazır nesne döner. */
+    private static String uiFor; private static Identifier uiVal;
+    public static Identifier fUi() {
+        String f = CxFonts.current();
+        Identifier v = uiVal;
+        if (v == null || f != uiFor) { v = get("ui"); uiVal = v; uiFor = f; }
+        return v;
+    }
     public static Identifier fCaps() { return get("caps"); }
     public static Identifier fTitle() { return get("title"); }
     public static Identifier forId(String id, String kind) { return Identifier.of("cubixora", CxFonts.pathOf(id, kind)); }

@@ -11,7 +11,14 @@ public final class CxFont {
     public static final Identifier LOGO = Identifier.of("cubixora", "logo");
     private static final java.util.HashMap<String, Identifier> CACHE = new java.util.HashMap<>();
     private static Identifier get(String kind) { return CACHE.computeIfAbsent(CxFonts.path(kind), p -> Identifier.of("cubixora", p)); }
-    public static Identifier fUi() { return get("ui"); }
+    /** Varsayılan yazının yerine geçen yazı tipi; her harfte çağrıldığı için stil değişmedikçe hazır nesne döner. */
+    private static String uiFor; private static Identifier uiVal;
+    public static Identifier fUi() {
+        String f = CxFonts.current();
+        Identifier v = uiVal;
+        if (v == null || f != uiFor) { v = get("ui"); uiVal = v; uiFor = f; }
+        return v;
+    }
     public static Identifier fCaps() { return get("caps"); }
     public static Identifier fTitle() { return get("title"); }
     public static Identifier forId(String id, String kind) { return Identifier.of("cubixora", CxFonts.pathOf(id, kind)); }

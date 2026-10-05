@@ -32,7 +32,16 @@ public final class CxFonts {
     public static String nameOf(String id) { for (String[] f : LIST) if (f[0].equals(id)) return f[1]; return LIST[0][1]; }
 
     public static boolean known(String id) { if (id == null) return false; for (String[] f : LIST) if (f[0].equals(id)) return true; return false; }
-    public static String current() { String f = CxClient.settings == null ? null : CxClient.settings.font; return known(f) ? f : "exo2"; }
+    /** Her harf çiziminde çağrılır: ayar değişmedikçe (aynı nesne) liste taranmaz. */
+    private static volatile String[] cur = { null, "exo2" };
+    public static String current() {
+        String f = CxClient.settings == null ? null : CxClient.settings.font;
+        String[] c = cur;
+        if (f == c[0] && f != null) return c[1];
+        String v = known(f) ? f : "exo2";
+        cur = new String[] { f, v };
+        return v;
+    }
     /** kind: ui | caps | title -> cubixora:<yol> yazı tipi kaynağı. */
     public static String path(String kind) { return pathOf(current(), kind); }
     public static String pathOf(String id, String kind) {

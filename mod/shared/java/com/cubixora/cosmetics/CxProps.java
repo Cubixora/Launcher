@@ -47,12 +47,14 @@ public final class CxProps {
 
     private static final Map<String, Model> CACHE = new ConcurrentHashMap<>();
     private static final Model MISSING = new Model(null, null);
+    private static final java.util.regex.Pattern ID_OK = java.util.regex.Pattern.compile("[a-z0-9_]{1,24}");
 
     /** Model hazırsa döner; dosya yoksa/bozuksa null (bir daha denenmez). */
     public static Model get(String id) {
-        if (id == null || id.isEmpty() || !id.matches("[a-z0-9_]{1,24}")) return null;
-        Model m = CACHE.get(id);
+        if (id == null || id.isEmpty()) return null;
+        Model m = CACHE.get(id);   // her karede çağrılır: önce önbellek (kalıp kontrolü yalnız ilk seferde)
         if (m == null) {
+            if (!ID_OK.matcher(id).matches()) return null;
             try { m = load(id); } catch (Throwable t) { Cubixora.LOG.warn("Model yüklenemedi: " + id, t); m = MISSING; }
             CACHE.put(id, m);
         }

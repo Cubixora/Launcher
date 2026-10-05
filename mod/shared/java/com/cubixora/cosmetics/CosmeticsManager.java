@@ -37,6 +37,12 @@ public final class CosmeticsManager {
     private static final Map<String, PlayerCosmetics> CACHE = new ConcurrentHashMap<>();
     private static final Map<String, Long> MISSES = new ConcurrentHashMap<>();
     private static final Set<String> PENDING = ConcurrentHashMap.newKeySet();
+    /** Aynı anda en fazla bu kadar istek: kalabalık sunucuda TAB açılınca yüzlerce istek birden gidip oyunu takmasın. */
+    private static final int MAX_PARALLEL = 4;
+    private static final java.util.concurrent.ConcurrentLinkedQueue<String> QUEUE = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private static final java.util.concurrent.atomic.AtomicInteger RUNNING = new java.util.concurrent.atomic.AtomicInteger();
+    /** Son yanıtın özeti: değişmediyse skin/pelerin dokusu yeniden çözülüp yüklenmez (5 dakikada bir takılma olmasın). */
+    private static final Map<String, Integer> SRC = new ConcurrentHashMap<>();
     private static final Set<String> KNOWN_CAPES = Set.of("cubixora", "galaksi", "lav", "gunbatimi", "buz", "zumrut");
     private static final Set<String> KNOWN_WINGS = Set.of("ejderha", "melek", "gece");
 
@@ -157,6 +163,7 @@ public final class CosmeticsManager {
 
     public static void reloadAll() {
         MISSES.clear();
+        SRC.clear();
         for (Map.Entry<String, PlayerCosmetics> e : CACHE.entrySet()) {
             if (!e.getValue().local) fetch(e.getKey());
         }
@@ -169,6 +176,19 @@ public final class CosmeticsManager {
             return;
         }
         if (!PENDING.add(key)) return;
+        QUEUE.add(key);
+        pump();
+    }
+
+    private static void pump() {
+        String k;
+        while (RUNNING.get() < MAX_PARALLEL && (k = QUEUE.poll()) != null) {
+            RUNNING.incrementAndGet();
+            try { start(k); } catch (Throwable t) { PENDING.remove(k); RUNNING.decrementAndGet(); }
+        }
+    }
+
+    private static void start(String key) {
         String url = fsBase != null ? fsBase + "/documents/cosmetics/" + URLEncoder.encode(key, StandardCharsets.UTF_8)
                 : "https://firestore.googleapis.com/v1/projects/" + projectId
                 + "/databases/(default)/documents/cosmetics/" + URLEncoder.encode(key, StandardCharsets.UTF_8)
@@ -179,7 +199,14 @@ public final class CosmeticsManager {
                 if (err != null || res.statusCode() != 200) {
                     MISSES.put(key, System.currentTimeMillis());
                     PlayerCosmetics old = CACHE.get(key);
-                    if (res != null && res.statusCode() == 404 && old != null && !old.local) CACHE.remove(key);
+                    if (res != null && res.statusCode() == 404 && old != null && !old.local) { CACHE.remove(key); SRC.remove(key); }
+                    return;
+                }
+                int sig = res.body().hashCode();
+                PlayerCosmetics same = CACHE.get(key);
+                if (same != null && !same.local && Integer.valueOf(sig).equals(SRC.get(key))) {   // değişmemiş: sadece süreyi yenile
+                    same.loadedAt = System.currentTimeMillis();
+                    MISSES.remove(key);
                     return;
                 }
                 JsonObject fields = json(res.body()).getAsJsonObject().getAsJsonObject("fields");
@@ -191,12 +218,15 @@ public final class CosmeticsManager {
                 PlayerCosmetics old = CACHE.get(key);
                 if (old != null && old.local) return; // kendi kaydımız öncelikli
                 CACHE.put(key, parse(key, o, skin, capeTex, wingsTex));
+                SRC.put(key, sig);
                 MISSES.remove(key);
             } catch (Exception e) {
                 Cubixora.LOG.debug("Kozmetik okunamadı: {}", key, e);
                 MISSES.put(key, System.currentTimeMillis());
             } finally {
                 PENDING.remove(key);
+                RUNNING.decrementAndGet();
+                pump();
             }
         });
     }

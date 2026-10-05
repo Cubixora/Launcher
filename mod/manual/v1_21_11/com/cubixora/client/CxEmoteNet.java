@@ -34,6 +34,7 @@ public final class CxEmoteNet {
     private static volatile boolean inFlight;
     private static long nextPoll;
     private static int tickN;
+    private static final java.util.regex.Pattern NAME = java.util.regex.Pattern.compile("[A-Za-z0-9_]{3,16}");
 
     public static void send(String id) {
         if (!CxBridge.available()) return;
@@ -57,7 +58,7 @@ public final class CxEmoteNet {
         StringBuilder b = new StringBuilder("[");
         int k = 0;
         for (String n : CxPlayersScreen.tabNames()) {
-            if (!n.matches("[A-Za-z0-9_]{3,16}")) continue;
+            if (!NAME.matcher(n).matches()) continue;
             Double d = dist.get(n.toLowerCase(Locale.ROOT));
             if (k++ > 0) b.append(',');
             b.append("{\"n\":\"").append(n).append("\",\"d\":").append(d == null ? -1 : Math.round(d * 10) / 10.0).append('}');
@@ -73,7 +74,7 @@ public final class CxEmoteNet {
         List<String> names = new ArrayList<>();
         for (AbstractClientPlayerEntity p : mc.world.getPlayers()) {
             String n = p.getName().getString().toLowerCase(Locale.ROOT);
-            if (n.equals(me) || !n.matches("[a-z0-9_]{3,16}") || mc.player.squaredDistanceTo(p) > 4096) continue;
+            if (n.equals(me) || !NAME.matcher(n).matches() || mc.player.squaredDistanceTo(p) > 4096) continue;
             if (CosmeticsManager.get(n) == null) continue;   // Cubixora kullanmayanları sorgulama
             names.add(n);
             if (names.size() >= 30) break;

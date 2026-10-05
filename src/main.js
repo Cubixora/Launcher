@@ -1093,7 +1093,14 @@ function fsVal(v) {
 }
 const fsFields = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, fsVal(v)]));
 const fsName = (p) => `projects/cubixora/databases/(default)/documents/${p}`;
-async function cosmeticDoc(name) {
+const cosLoading = new Map();   // aynı oyuncu için aynı anda gelen istekler tek okumada birleşir
+function cosmeticDoc(name) {
+  if (cosLoading.has(name)) return cosLoading.get(name);
+  const pr = cosmeticDocLoad(name).finally(() => cosLoading.delete(name));
+  cosLoading.set(name, pr);
+  return pr;
+}
+async function cosmeticDocLoad(name) {
   const c = cosCache.get(name);
   if (c && (c.doc || Date.now() - c.at < 30 * 60 * 1000)) return c.doc;
   const d = await cloud.sb().get(`cosmetics/${name}`, false).catch(() => undefined);
@@ -1239,7 +1246,8 @@ async function launchProfileInner(profileId, opt = {}) {
     root: MC_ROOT,
     javaPath,
     version: { number: p.version, type: vInfo ? vInfo.type : 'release', ...(custom ? { custom } : {}) },
-    memory: { max: `${p.ram || config.settings.defaultRam}G`, min: `${Math.min(config.settings.minRam || 1, p.ram || config.settings.defaultRam)}G` },
+    // başlangıç belleği en az yarısı: oyun açıkken yığın sürekli büyüyüp küçülmez (bu yeniden boyutlanmalar takılma yapar)
+    memory: (() => { const mx = Number(p.ram || config.settings.defaultRam) || 4; const mn = Math.min(mx, Math.max(Number(config.settings.minRam) || 1, Math.ceil(mx / 2))); return { max: `${mx}G`, min: `${mn}G` }; })(),
     overrides: { gameDirectory: gameDir, detached: true },
     window: (p.fullscreen || config.settings.fullscreen) ? { fullscreen: true }
       : (/^\d+x\d+$/.test(config.settings.resolution || '') ? { width: Number(config.settings.resolution.split('x')[0]), height: Number(config.settings.resolution.split('x')[1]) } : undefined)
@@ -1251,7 +1259,9 @@ async function launchProfileInner(profileId, opt = {}) {
       ? { type: 'multiplayer', identifier: `${host}:${port || 25565}` }
       : { type: 'legacy', identifier: `${host}:${port || 25565}` };
   }
-  opts.customArgs = p.jvmArgs ? p.jvmArgs.split(' ').filter(Boolean) : [];
+  const userJvm = p.jvmArgs ? p.jvmArgs.split(' ').filter(Boolean) : [];
+  // Takılmaları azaltan çöp toplayıcı ayarları (kullanıcı kendi GC ayarını yazdıysa onunki kullanılır)
+  opts.customArgs = [...(userJvm.some((a) => /^-XX:\+Use\w*GC$/.test(a)) ? [] : SMOOTH_JVM), ...userJvm];
   if (cos && custom) opts.customArgs.push(`-Dfabric.addMods=${cos.addMods}`);
 
   launcher.on('debug', (e) => log(`[debug] ${e}`));
@@ -1295,6 +1305,10 @@ async function launchProfileInner(profileId, opt = {}) {
   if (config.settings.closeOnLaunch && win) win.hide();
   return true;
 }
+
+// Oyun içi takılmaları (GC duraklamaları) azaltan Java ayarları: kısa duraklamalı G1, geniş genç nesil, açık System.gc() kapalı
+const SMOOTH_JVM = ['-XX:+UnlockExperimentalVMOptions', '-XX:+UseG1GC', '-XX:MaxGCPauseMillis=37', '-XX:G1NewSizePercent=20', '-XX:G1ReservePercent=20',
+  '-XX:G1HeapRegionSize=16M', '-XX:+ParallelRefProcEnabled', '-XX:+DisableExplicitGC', '-XX:+PerfDisableSharedMem', '-XX:+UseStringDeduplication'];
 
 function versionAtLeast(v, min) {
   if (/^\d{2}\./.test(v)) return true; // 26.x ve sonrası

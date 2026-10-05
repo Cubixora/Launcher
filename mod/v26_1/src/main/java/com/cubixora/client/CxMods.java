@@ -268,8 +268,15 @@ public final class CxMods {
     }
 
     /** Bağlı olunan sunucu adresi (partner sunucu süresi için); JSON'a güvenli. */
-    private static String srvJson(Minecraft mc) {
-        try { String a = com.cubixora.cosmetics.Compat.serverAddress(mc); return a == null ? "" : a.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9._:\\-\\[\\]]", ""); } catch (Throwable t) { return ""; }
+    private static final java.util.regex.Pattern SRV_BAD = java.util.regex.Pattern.compile("[^a-z0-9._:\\-\\[\\]]");
+    private static String srvRaw, srvOut = "";
+    private static String srvJson(Minecraft mc) {   // saniyede 10 kez çağrılır: adres değişmedikçe hazır sonuç
+        try {
+            String a = com.cubixora.cosmetics.Compat.serverAddress(mc);
+            if (a == null) return "";
+            if (!a.equals(srvRaw)) { srvOut = SRV_BAD.matcher(a.toLowerCase(java.util.Locale.ROOT)).replaceAll(""); srvRaw = a; }
+            return srvOut;
+        } catch (Throwable t) { return ""; }
     }
 
     private static boolean reservedKey(int k) {

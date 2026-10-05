@@ -212,6 +212,8 @@ function startBackground() {
     ctx.stroke();
   }
   (function frame() {
+    // oyun açıkken arka plan animasyonu durur (ekran kartı oyuna kalsın), saniyede bir kontrol edilir
+    if (window.CX_SUSPEND) { setTimeout(() => requestAnimationFrame(frame), 1000); return; }
     if (!document.hidden) {
       ctx.clearRect(0, 0, w, h);
       ctx.lineWidth = devicePixelRatio;

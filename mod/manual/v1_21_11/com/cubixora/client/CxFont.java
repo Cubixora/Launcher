@@ -11,7 +11,14 @@ public final class CxFont {
     public static final StyleSpriteSource LOGO = new StyleSpriteSource.Font(Identifier.of("cubixora", "logo"));
     private static final java.util.HashMap<String, StyleSpriteSource> CACHE = new java.util.HashMap<>();
     private static StyleSpriteSource get(String kind) { return CACHE.computeIfAbsent(CxFonts.path(kind), p -> new StyleSpriteSource.Font(Identifier.of("cubixora", p))); }
-    public static StyleSpriteSource fUi() { return get("ui"); }
+    /** Varsayılan yazının yerine geçen yazı tipi; her harfte çağrıldığı için stil değişmedikçe hazır nesne döner. */
+    private static String uiFor; private static StyleSpriteSource uiVal;
+    public static StyleSpriteSource fUi() {
+        String f = CxFonts.current();
+        StyleSpriteSource v = uiVal;
+        if (v == null || f != uiFor) { v = get("ui"); uiVal = v; uiFor = f; }
+        return v;
+    }
     public static StyleSpriteSource fCaps() { return get("caps"); }
     public static StyleSpriteSource fTitle() { return get("title"); }
     public static StyleSpriteSource forId(String id, String kind) { return new StyleSpriteSource.Font(Identifier.of("cubixora", CxFonts.pathOf(id, kind))); }
