@@ -570,7 +570,6 @@ const Admin = (() => {
           <small class="${info.keyOk ? 'ok' : 'danger'}">${info.keyOk ? '✓ Anahtar bulundu' : '✕ Anahtar dosyası bulunamadı'}</small>
           ${field('Güncelleme notu (oyunculara gösterilir)', '<textarea class="input" id="puNotes" rows="3" placeholder="Ör: Yeni kozmetikler ve hata düzeltmeleri"></textarea>')}
           ${field('GitHub anahtarı (paketler GitHub Releases\'a yüklenir)', `<input class="input" id="puGh" type="password" placeholder="${info.ghSaved ? 'Kayıtlı (değiştirmek için yeni anahtarı yaz)' : 'github_pat_... (Cubixora/Launcher, Contents: Read and write)'}" autocomplete="off" />`)}
-          ${info.legacy ? '<label class="s-row"><input type="checkbox" id="puLegacy" /> <span>Eski (Firebase\'li) launcher\'lara da gönder — geçiş için bir kez. Yayınlarken Google ile admin hesabına giriş istenir.</span></label>' : ''}
           <div class="ad-save"><span class="muted" id="puProg">Şu anki sürüm: #${info.build}</span><button class="btn btn-primary" id="puGo">Güncellemeyi yayınla</button></div>
         </div>
         <p class="ad-p danger">⚠ GIZLI-yayin-anahtari.key dosyasını kimseyle paylaşma ve kaybetme. Bu anahtar olmadan güncelleme yayınlanamaz; başkasının eline geçerse adına güncelleme çıkarabilir.</p>
@@ -584,20 +583,11 @@ const Admin = (() => {
         <div class="ad-card col">
           <b>Veritabanı</b>
           <p class="ad-p" id="dbInfo">Kontrol ediliyor...</p>
-          ${info.legacy ? `<p class="ad-p">Firebase'deki tüm verileri (profiller, coinler, envanterler, arkadaşlıklar, sohbetler, çekilişler) Supabase'e kopyalar. Firebase'deki veriler silinmez. Tekrar çalıştırmak güvenlidir: aynı belgeler üzerine yazılır.</p>
-          <p class="ad-p muted">Düğmeye basınca tarayıcıda Google girişi açılır: cubixora@gmail.com hesabını seç.</p>
-          <div class="ad-save"><span class="muted" id="mgProg"></span><button class="btn btn-ghost" id="mgGo">Firebase'den Supabase'e taşı</button></div>` : ''}
         </div>`;
       sc('adminDbStats').then((r) => {
         const el = $('#dbInfo'); if (!el) return;
         el.textContent = `Supabase · ${r.docs} belge · ${(r.bytes / 1048576).toFixed(1)} MB / 500 MB`;
       }).catch((e) => { const el = $('#dbInfo'); if (el) el.textContent = e.message; });
-      if ($('#mgGo')) $('#mgGo').onclick = async () => {
-        if (!(await confirmBox('Veriler taşınsın mı?', "Firebase'deki tüm belgeler Supabase'e kopyalanacak. Bu işlem Firebase okuma kotası kullanır; kota yeni sıfırlandığında yap.", 'Taşı'))) return;
-        const b = $('#mgGo'); b.classList.add('loading');
-        try { const r = await sc('adminMigrate', { googleIdToken: await cx.adminGoogleToken() }); toast(`${r.total} belge Supabase'e taşındı.`, 'success'); $('#mgProg').textContent = `Bitti: ${r.total} belge`; }
-        catch (e) { toast(e.message, 'error'); } finally { b.classList.remove('loading'); }
-      };
       const pvGo = async (mode) => {
         try { await cx.previewStart(mode); toast('Önizleme penceresi açılıyor...', 'success'); }
         catch (e) { toast(e.message, 'error'); }
@@ -611,11 +601,10 @@ const Admin = (() => {
         if (!(await confirmBox('Güncelleme yayınlansın mı?', 'Tüm oyunculara gidecek. Yayınlamadan önce launcher\'ı kendi bilgisayarında 1-BASLAT.bat ile denediğinden emin ol.', 'Yayınla'))) return;
         const b = $('#puGo'); b.classList.add('loading');
         try {
-          const legacyGoogleToken = $('#puLegacy') && $('#puLegacy').checked ? await cx.adminGoogleToken() : '';
           const r = await sc('adminPublish', { dir: $('#puDir').value.trim(), keyFile: $('#puKey').value.trim(), notes: $('#puNotes').value,
-            ghToken: $('#puGh').value.trim(), legacyGoogleToken });
-          $('#puGh').value = ''; if ($('#puLegacy')) $('#puLegacy').checked = false;
-          toast(`Güncelleme #${r.build} yayınlandı (${r.files} dosya, ${(r.size / 1024).toFixed(0)} KB)${r.legacy ? ' · eski sürümlere de gönderildi' : ''}.`, 'success');
+            ghToken: $('#puGh').value.trim() });
+          $('#puGh').value = '';
+          toast(`Güncelleme #${r.build} yayınlandı (${r.files} dosya, ${(r.size / 1024).toFixed(0)} KB).`, 'success');
           $('#puProg').textContent = `Yayınlandı: #${r.build}`;
         } catch (e) { toast(e.message, 'error'); } finally { b.classList.remove('loading'); }
       };
@@ -627,7 +616,6 @@ const Admin = (() => {
     $$('#adTabs button').forEach((b) => (b.onclick = () => show(b.dataset.t)));
     cx.on('preview:state', (p) => { const el = $('#pvState'); if (el) el.textContent = p && p.running ? 'Önizleme şu an açık' : ''; });
     cx.on('admin:publish', (p) => { const el = $('#puProg'); if (el) el.textContent = `${p.stage} ${p.current}/${p.total}`; });
-    cx.on('admin:migrate', (p) => { const el = $('#mgProg'); if (el) el.textContent = `${p.stage} · ${p.total} belge`; });
   }
   return { enter };
 })();

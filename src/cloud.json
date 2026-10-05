@@ -1,8 +1,4 @@
 {
   "supabaseUrl": "https://mnkkhlceubglkxlvjtzl.supabase.co",
-  "supabaseKey": "sb_publishable_NxYMNgjy_-669uKkSolXYg_K2JUcz8I",
-  "firebaseLegacy": {
-    "apiKey": "AIzaSyD7idh75N_ulMnAifBTtcIG3Bn9IqQiibc",
-    "projectId": "cubixora-launcher"
-  }
+  "supabaseKey": "sb_publishable_NxYMNgjy_-669uKkSolXYg_K2JUcz8I"
 }

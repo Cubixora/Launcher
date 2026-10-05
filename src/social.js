@@ -51,8 +51,6 @@ module.exports = function createSocial(ctx) {
   const { cloud, getConfig, saveConfig, send, log, protect, unprotect, DATA_DIR, app } = ctx;
   // veritabanı: Supabase (bulut kapalıysa bağlanmayan boş bir istemci; sosyal özellikler zaten giriş ister)
   const db = cloud.sb() || require('./sbdb')({ url: 'https://bulut-kapali.invalid', key: '', token: async () => null });
-  // GEÇİCİ: Firebase'den taşıma ve eski sürümlere son gönderim için (admin). Bkz. legacy-firebase.js
-  const legacy = () => require('./legacy-firebase')(cloud.cfg().firebaseLegacy);
 
   const me = () => cloud.uid();
   const acct = () => getConfig().account;
@@ -1055,55 +1053,7 @@ module.exports = function createSocial(ctx) {
     return l.sort((a, b) => (b.at || 0) - (a.at || 0));
   }
   async function adminDeleteReport(id) { needAdmin(); await db.del(`reports/${String(id).replace(/[^a-z0-9]/gi, '')}`); return true; }
-  // ------------------------------------------------------------ Firebase -> Supabase taşıma (bir kez, admin)
-  // Hesaplar eski kimlikleriyle taşındığı için (app_metadata.fbuid) tüm belgeler olduğu gibi kopyalanır.
-  async function adminMigrate({ googleIdToken } = {}) {
-    needAdmin();
-    const lf = legacy();
-    if (!lf) throw new Error('cloud.json içinde firebaseLegacy ayarı yok.');
-    if (!googleIdToken) throw new Error('Önce eski Firebase hesabına Google ile bağlan.');
-    await lf.signIn(googleIdToken);
-    const fdb = lf.db;
-    const TOP = ['config', 'news', 'notifications', 'giftCodes', 'betaKeys', 'users', 'emails', 'bannedEmails', 'usernames', 'handles', 'cosmetics',
-      'profiles', 'giveaways', 'privates', 'wallets', 'inventory', 'friendRequests', 'friendships', 'chats', 'groups', 'reports'];
-    const GROUPS = ['items', 'messages', 'entries'];
-    let total = 0, buf = [], bytes = 0;
-    const prog = (stage) => send('admin:migrate', { stage, total });
-    const flush = async () => { if (!buf.length) return; await db.rpc('fs_import', { docs: buf }); buf = []; bytes = 0; prog('Yazılıyor'); };
-    const push = async (d) => {
-      const { id, path: p, _updated, ...data } = d; void id;
-      if (!p || p.startsWith('bundle/')) return;
-      if (p === 'config/app') { data.legacy = true; delete data.chunks; }   // sadece sürüm numarası taşınır (paket indirme adresi yok)
-      const item = { path: p, data, updated: _updated || 0 };
-      const sz = JSON.stringify(item).length;
-      if (bytes && bytes + sz > 600000) await flush();
-      buf.push(item); bytes += sz; total++;
-    };
-    for (const col of TOP) {
-      let tok = '';
-      do {
-        prog(`Okunuyor: ${col}`);
-        const j = await fdb.listPage(col, { pageSize: 300, pageToken: tok });
-        for (const d of j.docs) await push(d);
-        tok = j.next;
-      } while (tok);
-    }
-    for (const g of GROUPS) {
-      let after = '';
-      for (;;) {
-        prog(`Okunuyor: ${g}`);
-        const docs = await fdb.queryGroup(g, { pageSize: 300, after });
-        for (const d of docs) await push(d);
-        if (docs.length < 300) break;
-        after = docs[docs.length - 1].path;
-      }
-    }
-    await flush();
-    cache.config = {};
-    log(`[taşıma] ${total} belge Supabase'e kopyalandı`);
-    return { total };
-  }
-  async function adminDbStats() { needAdmin(); return { kind: 'supabase', legacy: !!legacy(), ...(await db.rpc('fs_stats')) }; }
+  async function adminDbStats() { needAdmin(); return { kind: 'supabase', ...(await db.rpc('fs_stats')) }; }
 
   async function adminDeleteNotification(id) { needAdmin(); await db.del(`notifications/${id}`); notifGlobal.at = 0; return true; }
   async function adminUser(q) {
@@ -1237,7 +1187,6 @@ module.exports = function createSocial(ctx) {
 
   // güncelleme yayınla: klasördeki launcher kodunu paketler, gizli anahtarla imzalar
   // Güncelleme yayınla: paket imzalanır, GitHub Releases'a ("app-bundle" sürümü) yüklenir, sürüm bilgisi Supabase config/app'e yazılır.
-  // legacyGoogleToken verilirse paket ayrıca eski (Firebase'li) launcher'lara da gönderilir (geçiş için, bir kez).
   const GH_REPO = 'Cubixora/Launcher', GH_TAG = 'app-bundle';
   async function ghCall(token, method, url, body, headers = {}) {
     const r = await fetch(url.startsWith('http') ? url : `https://api.github.com${url}`, {
@@ -1248,7 +1197,7 @@ module.exports = function createSocial(ctx) {
     if (!r.ok) throw new Error(r.status === 401 ? 'GitHub anahtarı geçersiz ya da süresi dolmuş.' : r.status === 403 ? 'GitHub anahtarının bu depoya yazma izni yok (Contents: Read and write).' : `GitHub hatası: ${j.message || r.status}`);
     return j;
   }
-  async function adminPublish({ dir, keyFile, notes, ghToken, legacyGoogleToken }) {
+  async function adminPublish({ dir, keyFile, notes, ghToken }) {
     needAdmin();
     const { createZip, collect } = require('./ziputil');
     if (!fs.existsSync(path.join(dir, 'main.js')) || !fs.existsSync(path.join(dir, 'renderer'))) throw new Error('Seçilen klasör launcher\'ın "src" klasörü değil.');
@@ -1256,11 +1205,8 @@ module.exports = function createSocial(ctx) {
     const c = getConfig();
     const token = String(ghToken || '').trim() || (c.adminPublish && c.adminPublish.gh ? unprotect(c.adminPublish.gh) : '');
     if (!token) throw new Error('GitHub anahtarını yaz (bir kez yazman yeterli, sonra hatırlanır).');
-    let lf = null;
-    if (legacyGoogleToken) { lf = legacy(); if (!lf) throw new Error('cloud.json içinde firebaseLegacy ayarı yok.'); await lf.signIn(legacyGoogleToken); }
     const cur = await db.get('config/app', false);
-    const old = lf ? await lf.db.get('config/app', false).catch(() => null) : null;
-    const build = Math.max((cur && cur.build) || 0, (old && old.build) || 0, (global.__cubixora && global.__cubixora.build) || 0) + 1;
+    const build = Math.max((cur && cur.build) || 0, (global.__cubixora && global.__cubixora.build) || 0) + 1;
     const files = collect(dir, dir, (rel) => /(^|\/)(node_modules|\.git)(\/|$)/.test(rel) || /\.key$/i.test(rel));
     const bj = files.find((f) => f.name === 'build.json');
     const bjData = Buffer.from(JSON.stringify({ build }, null, 2));
@@ -1286,18 +1232,8 @@ module.exports = function createSocial(ctx) {
       const b = Number((/^cubixora-b(\d+)\.zip$/.exec(a.name) || [])[1] || 0);
       if (b && b < build - 1) await ghCall(token, 'DELETE', `/repos/${GH_REPO}/releases/assets/${a.id}`).catch(() => {});
     }
-    // 3) GEÇİCİ: eski (Firebase'li) launcher'lara da gönder
-    if (lf) {
-      const b64 = zip.toString('base64'), CH = 900000, chunks = Math.ceil(b64.length / CH);
-      for (let i = 0; i < chunks; i++) {
-        await lf.db.set(`bundle/b${build}-${i}`, { data: b64.slice(i * CH, (i + 1) * CH) });
-        send('admin:publish', { stage: 'Eski sürümlere gönderiliyor', current: i + 1, total: chunks });
-      }
-      await lf.db.set('config/app', { build, chunks, sha256: sha, sig, size: zip.length, notes: String(notes || '').slice(0, 500), at: lf.db.ts(now()) });
-      if (old && old.build && old.chunks) for (let i = 0; i < old.chunks + 2; i++) lf.db.del(`bundle/b${old.build}-${i}`).catch(() => {});
-    }
     c.adminPublish = { ...(c.adminPublish || {}), dir, keyFile, gh: protect(token) }; saveConfig();
-    return { build, size: zip.length, files: files.length, legacy: !!lf };
+    return { build, size: zip.length, files: files.length };
   }
 
   // ------------------------------------------------------------ yaşam döngüsü
@@ -1522,7 +1458,7 @@ module.exports = function createSocial(ctx) {
     conversations, messages, openDm, sendMessage, deleteMessage, createGroup, groupAction, markRead,
     notifications, markNotificationsSeen, activityOf, achievementView, claimAchievement, track,
     shop, buy, redeem, partners, limits, coinBuy, adminTake, achievements, addBetaKey, betaInfo, presets,
-    submitReport, adminMigrate, adminDbStats, adminReports, adminDeleteReport, adminGet, adminSet, adminNotify, adminDeleteNotification, adminUser, adminGrant, adminRevoke, adminBan, adminBannedEmails, adminBanEmail, adminUnbanEmail, adminDeleteUser, adminSetRoles, hasPlusPerk,
+    submitReport, adminDbStats, adminReports, adminDeleteReport, adminGet, adminSet, adminNotify, adminDeleteNotification, adminUser, adminGrant, adminRevoke, adminBan, adminBannedEmails, adminBanEmail, adminUnbanEmail, adminDeleteUser, adminSetRoles, hasPlusPerk,
     adminCodes, adminSaveCode, adminDeleteCode, adminBetaKeys, adminSaveBetaKey, adminDeleteBetaKey, adminPublish,
     levelOf, lpFor, inventory: myInv, timedLive, timedAll: () => ({ ...timedCache }),
     news, adminNewsList, adminNewsSave, adminNewsDelete, questView, claimQuestStep, claimQuestReward, levelView, claimLevel, quests,
