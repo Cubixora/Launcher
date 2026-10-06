@@ -143,7 +143,9 @@ const cloud = require('./cloud')({
 const modToasts = [];
 const modToast = (t, s) => { if (gameRunning) { modToasts.push({ t: String(t || '').slice(0, 60), s: String(s || '').slice(0, 90) }); if (modToasts.length > 6) modToasts.shift(); } };
 const social = require('./social')({ cloud, getConfig: () => config, saveConfig, send, log, protect, unprotect, DATA_DIR, app, modToast });
-const discord = require('./discord')({ remote: (...a) => social.remote(...a), getSettings: () => config.settings, log });
+// Discord kayıtları günlüğe ve (geliştirici bilgisayarında) masaüstündeki launcher klasörüne yazılır
+const dlog = (l) => { log(l); try { const d = path.join(app.getPath('desktop'), 'cubixora-launcher'); if (fs.existsSync(path.join(d, 'src'))) fs.appendFileSync(path.join(d, 'discord-kaydi.txt'), `[${new Date().toLocaleTimeString('tr-TR')}] ${l}\n`); } catch {} };
+const discord = require('./discord')({ remote: (...a) => social.remote(...a), getSettings: () => config.settings, log: dlog });
 const features = require('./features')({
   getJSON, downloadFile, profileDir, findProfile: (id) => findProfile(id), log, send, unprotect, UA,
   getConfig: () => config, rememberMod: (h, i) => cloud.rememberMod(h, i)
