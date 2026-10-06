@@ -1297,7 +1297,7 @@ async function launchProfileInner(profileId, opt = {}) {
   gameRunning = true; gameChild = child; gameKilled = false;
   p.lastPlayed = Date.now();
   saveConfig();
-  discord.setGame(p.version, opt.serverName || '', (config.account && config.account.name) || '', child && child.pid);
+  discord.setGame(p.version, opt.serverName || '', (config.account && config.account.name) || '');   // oyun sürecine bağlamak Discord'da kartı tamamen gizliyordu
   social.setGame(opt.serverName ? `${opt.serverName} sunucusunda` : `Minecraft ${p.version} oynuyor`);
   social.track('game');
   // oyundaki Cubixora oyuncuları (TAB logosu, ses ağı) birbirini tanısın: hesap belgesi bulutta olsun
