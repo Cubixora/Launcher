@@ -6,8 +6,8 @@ const path = require('path');
 
 module.exports = function createDiscord({ remote, getSettings, log }) {
   let sock = null, clientId = '', ready = false, buf = Buffer.alloc(0), retry = null, startTs = Date.now();
-  let state = { phase: 'menu', version: '', server: '', player: '' };
-  let wanted = null, nonce = 1, connecting = false;
+  let state = { phase: 'menu', version: '', server: '', player: '', pid: 0 };
+  let wanted = null, nonce = 1, connecting = false, lastPid = 0;
 
   const pipePaths = () => {
     if (process.platform === 'win32') return Array.from({ length: 10 }, (_, i) => `\\\\?\\pipe\\discord-ipc-${i}`);
@@ -69,14 +69,18 @@ module.exports = function createDiscord({ remote, getSettings, log }) {
       if (w.id && w.id !== clientId) { close(); clientId = w.id; connect(); return; }
       if (!clientId && w.id) { clientId = w.id; connect(); return; }
       if (!ready || !sock) return;
-      sock.write(frame(1, { cmd: 'SET_ACTIVITY', args: { pid: process.pid, activity: w.act }, nonce: String(nonce++) }));
+      // oyundayken etkinlik oyunun kendi sürecine bağlanır: Discord'un otomatik "Minecraft" kartı yerine bizimki görünür
+      const pid = state.phase === 'game' && state.pid ? state.pid : process.pid;
+      if (lastPid && lastPid !== pid) sock.write(frame(1, { cmd: 'SET_ACTIVITY', args: { pid: lastPid }, nonce: String(nonce++) }));
+      lastPid = pid;
+      sock.write(frame(1, { cmd: 'SET_ACTIVITY', args: { pid, activity: w.act }, nonce: String(nonce++) }));
     } catch (e) { log && log('[discord] ' + e.message); }
   }
 
   return {
     start() { push(); },
-    setGame(version, server, player) { state = { phase: 'game', version: version || '', server: server || '', player: player || '' }; startTs = Date.now(); push(); },
-    setMenu() { state = { phase: 'menu', version: '', server: '', player: '' }; startTs = Date.now(); push(); },
+    setGame(version, server, player, pid) { state = { phase: 'game', version: version || '', server: server || '', player: player || '', pid: Number(pid) || 0 }; startTs = Date.now(); push(); },
+    setMenu() { state = { phase: 'menu', version: '', server: '', player: '', pid: 0 }; startTs = Date.now(); push(); },
     refresh: push,
     stop() { if (retry) clearTimeout(retry); retry = null; close(); },
   };
