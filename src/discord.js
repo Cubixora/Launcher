@@ -7,7 +7,7 @@ const path = require('path');
 module.exports = function createDiscord({ remote, getSettings, log }) {
   let sock = null, clientId = '', ready = false, buf = Buffer.alloc(0), retry = null, startTs = Date.now();
   let state = { phase: 'menu', version: '', server: '', player: '', pid: 0 };
-  let wanted = null, nonce = 1, connecting = false, lastPid = 0;
+  let wanted = null, nonce = 1, connecting = false, lastPid = 0, missLogged = false;
 
   const pipePaths = () => {
     if (process.platform === 'win32') return Array.from({ length: 10 }, (_, i) => `\\\\?\\pipe\\discord-ipc-${i}`);
@@ -23,7 +23,7 @@ module.exports = function createDiscord({ remote, getSettings, log }) {
 
   function tryConnect(i = 0) {
     const list = pipePaths();
-    if (i >= list.length) { connecting = false; return schedule(); }
+    if (i >= list.length) { connecting = false; if (!missLogged) { missLogged = true; log && log('[discord] Discord uygulaması bulunamadı (açık mı?)'); } return schedule(); }
     const s = net.createConnection(list[i]);
     let ok = false;
     s.once('connect', () => {
@@ -37,11 +37,13 @@ module.exports = function createDiscord({ remote, getSettings, log }) {
         if (buf.length < 8 + len) break;
         let msg = null; try { msg = JSON.parse(buf.slice(8, 8 + len).toString()); } catch {}
         buf = buf.slice(8 + len);
-        if (msg && msg.evt === 'READY') { ready = true; push(); }
+        if (msg && msg.evt === 'READY') { ready = true; log && log(`[discord] bağlandı (${msg.data && msg.data.user ? msg.data.user.username : '?'})`); push(); }
+        else if (msg && msg.evt === 'ERROR') log && log(`[discord] hata: ${msg.data ? msg.data.message || JSON.stringify(msg.data) : '?'}`);
+        else if (msg && msg.cmd === 'SET_ACTIVITY' && msg.data) log && log(`[discord] etkinlik gösterildi: ${msg.data.details || ''} / ${msg.data.state || ''}`);
       }
     });
     s.on('error', () => { if (!ok) tryConnect(i + 1); });
-    s.on('close', () => { if (ok) { sock = null; ready = false; connecting = false; schedule(); } });
+    s.on('close', () => { if (ok) { log && log('[discord] bağlantı kapandı');  sock = null; ready = false; connecting = false; schedule(); } });
   }
   function schedule() { if (retry || !clientId) return; retry = setTimeout(() => { retry = null; connect(); }, 15000); }
   function connect() { if (sock || connecting || !clientId) return; connecting = true; try { tryConnect(0); } catch { connecting = false; } }
@@ -67,6 +69,7 @@ module.exports = function createDiscord({ remote, getSettings, log }) {
       const w = await build();
       if (s.discordPresence === false || w.off) { if (ready) sock.write(frame(1, { cmd: 'SET_ACTIVITY', args: { pid: process.pid }, nonce: String(nonce++) })); return; }
       if (w.id && w.id !== clientId) { close(); clientId = w.id; connect(); return; }
+      if (!w.id) { log && log('[discord] Application ID boş (Admin > Discord)'); return; }
       if (!clientId && w.id) { clientId = w.id; connect(); return; }
       if (!ready || !sock) return;
       // oyundayken etkinlik oyunun kendi sürecine bağlanır: Discord'un otomatik "Minecraft" kartı yerine bizimki görünür
