@@ -116,6 +116,11 @@ async function downloadFile(url, dest, sha1) {
   const res = await fetch(url, { headers: { 'User-Agent': UA }, signal: abortSig() });
   if (!res.ok) throw new Error(`İndirilemedi (${res.status}): ${url}`);
   const buf = Buffer.from(await res.arrayBuffer());
+  // indirilen dosya kaynağın verdiği özetle (SHA-1) karşılaştırılır; tutmazsa diske yazılmaz
+  if (sha1) {
+    const got = crypto.createHash('sha1').update(buf).digest('hex');
+    if (got !== String(sha1).toLowerCase()) throw new Error(`Dosya doğrulanamadı (özet uyuşmuyor): ${path.basename(dest)}`);
+  }
   await fsp.writeFile(dest, buf);
 }
 
